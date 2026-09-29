@@ -1,0 +1,46 @@
+# BrainWaves Project Configuration
+# Copy this file to settings.yaml and fill in your credentials
+
+# Emotiv Cortex API credentials
+emotiv:
+  client_id: "YOUR_CREDENTIALS_CLIENT_ID_HERE"
+  client_secret: "YOUR_CREDENTIALS_CLIENT_SECRET_HERE"
+  websocket_url: "wss://emotiv.com:9000"
+  app_name: "BrainBot"
+
+# EEG / Brainwave settings
+eeg:
+  sampling_rate: 128          # Hz (128 or 256 supported)
+  channels: 14                # EPOC X has 14 channels
+  buffer_size: 512            # samples per processing window
+  mental_command_sensitivity: 0.5  # 0.0-1.0
+  filter_low: 1.0             # Hz (high-pass)
+  filter_high: 40.0           # Hz (low-pass)
+  notch_filter: 60.0          # Hz (power line noise)
+
+# Mood detection settings
+mood:
+  window_seconds: 3.0         # analysis window for mood classification
+  alpha_band: [8.0, 12.0]     # Hz - relaxation / focus
+  beta_band: [13.0, 30.0]     # Hz - active thinking / concentration
+  theta_band: [4.0, 7.0]      # Hz - drowsiness / meditation
+  gamma_band: [30.0, 100.0]   # Hz - peak concentration
+
+# Temi robot settings
+temi:
+  robot_ip: "192.168.1.100"   # Replace with your Temi's IP address
+  port: 80
+  base_url: "http://192.168.1.100:80"
+  command_timeout: 5000        # ms
+
+# Interaction flow
+interaction:
+  calibration_time: 10.0       # seconds for baseline mental command training
+  feedback_interval: 2.0       # seconds between feedback to user
+  max_attempts: 5              # max mental command attempts before reset
+  dance_sequence:
+    - "turn_left"
+    - "turn_right"
+    - "move_forward"
+    - "say_hello"
+    - "dance"
