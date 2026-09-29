@@ -2,10 +2,12 @@
 # Copy this file to settings.yaml and fill in your credentials
 
 # Emotiv Cortex API credentials
+# Register a Cortex App at: https://www.emotiv.com/my-account/ → Cortex Apps
+# This is a DASHBOARD step — can be done before the headset arrives.
 emotiv:
   client_id: "YOUR_CREDENTIALS_CLIENT_ID_HERE"
   client_secret: "YOUR_CREDENTIALS_CLIENT_SECRET_HERE"
-  websocket_url: "wss://emotiv.com:9000"
+  websocket_url: "wss://localhost:6868"  # Local Cortex service only
   app_name: "BrainBot"
 
 # EEG / Brainwave settings
@@ -18,6 +20,13 @@ eeg:
   filter_high: 40.0           # Hz (low-pass)
   notch_filter: 60.0          # Hz (power line noise)
 
+# License requirements
+# Basic (free with EPOC X): com, met (0.1 Hz), fac, mot, sys
+# Premium (paid): raw EEG, high-res met (2 Hz)
+license:
+  level: "basic"              # Set to "premium" if you have a paid license
+  raw_eeg_available: false    # Requires premium license
+
 # Mood detection settings
 mood:
   window_seconds: 3.0         # analysis window for mood classification
@@ -27,17 +36,28 @@ mood:
   gamma_band: [30.0, 100.0]   # Hz - peak concentration
 
 # Temi robot settings
+# NOTE: Temi SDK is native Android. You need an Android app running on the robot
+# that exposes an HTTP/WebSocket API. The real SDK methods are:
+#   goTo, skidJoy, turnBy, tiltBy, speak, stopMovement
+# Build custom sequences from these primitives.
 temi:
   robot_ip: "192.168.1.100"   # Replace with your Temi's IP address
   port: 80
   base_url: "http://192.168.1.100:80"
   command_timeout: 5000        # ms
+  safety:
+    max_speed_ms: 0.3          # m/s — slow for open house crowds
+    enable_e_stop: true
+    stop_on_signal_loss: true
+    signal_loss_timeout: 3000  # ms
 
 # Interaction flow
 interaction:
-  calibration_time: 10.0       # seconds for baseline mental command training
+  calibration_time: 30.0       # seconds for baseline mental command training
   feedback_interval: 2.0       # seconds between feedback to user
   max_attempts: 5              # max mental command attempts before reset
+  use_fac_fallback: true       # Use facial expressions if mental commands fail
+  consent_required: true       # Visitor must consent before recording
   dance_sequence:
     - "turn_left"
     - "turn_right"

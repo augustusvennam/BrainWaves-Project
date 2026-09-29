@@ -1,6 +1,14 @@
 """
-Emotiv Cortex API v2/v4 WebSocket Client Wrapper.
+Emotiv Cortex API v2 WebSocket Client Wrapper.
 Handles authentication, session creation, mental command & performance metric subscriptions.
+
+CRITICAL NOTES (from review):
+- Only connects to wss://localhost:6868 (local Cortex service). No remote endpoint.
+- Uses self-signed certificate — must disable cert verification.
+- Streams available: com, met, fac, mot, sys, eeg (raw requires premium license)
+- Performance metrics include: eng, exc, str, rel, int, lex
+- Signal quality via 'eq' or 'dev' streams
+- Mental commands require 'neutral' baseline training first
 """
 import json
 import ssl
@@ -17,16 +25,19 @@ class CortexClient:
         self.auth_token = None
         self.session_id = None
         self.headset_id = None
-        self.callbacks = {}
         self.is_connected = False
+        self.message_handlers = {}
+        self._req_counter = 0
 
     def connect(self):
-        """Connect to local or remote Cortex WebSocket server."""
+        """Connect to local Cortex WebSocket server.
+        Cortex runs locally at wss://localhost:6868 with a self-signed certificate.
+        """
         print(f"[CortexClient] Connecting to {self.url}...")
         try:
             self.ws = websocket.create_connection(
                 self.url,
-                sslopt={"cert_reqs": ssl.CERT_NONE}
+                sslopt={"cert_reqs": ssl.CERT_NONE}  # Self-signed cert
             )
             self.is_connected = True
             print("[CortexClient] Connected successfully.")
@@ -36,13 +47,14 @@ class CortexClient:
             self.is_connected = False
             return False
 
-    def _send_request(self, method, params=None, req_id=1):
+    def _send_request(self, method, params=None):
         """Send JSON-RPC request and return parsed response."""
+        self._req_counter += 1
         payload = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params or {},
-            "id": req_id
+            "id": self._req_counter
         }
         self.ws.send(json.dumps(payload))
         resp = self.ws.recv()
@@ -56,14 +68,14 @@ class CortexClient:
         req_acc = self._send_request("requestAccess", {
             "clientId": self.client_id,
             "clientSecret": self.client_secret
-        }, req_id=1)
+        })
         
         # 2. Authorize
         auth_resp = self._send_request("authorize", {
             "clientId": self.client_id,
             "clientSecret": self.client_secret,
             "debit": 1
-        }, req_id=2)
+        })
         
         if "result" in auth_resp and "cortexToken" in auth_resp["result"]:
             self.auth_token = auth_resp["result"]["cortexToken"]
@@ -75,7 +87,7 @@ class CortexClient:
 
     def query_headset(self):
         """Scan for connected EPOC X or virtual headset."""
-        resp = self._send_request("queryHeadsets", {}, req_id=3)
+        resp = self._send_request("queryHeadsets", {})
         headsets = resp.get("result", [])
         if headsets:
             self.headset_id = headsets[0]["id"]
@@ -93,7 +105,7 @@ class CortexClient:
             "cortexToken": self.auth_token,
             "headset": self.headset_id,
             "status": status
-        }, req_id=4)
+        })
         if "result" in resp and "id" in resp["result"]:
             self.session_id = resp["result"]["id"]
             print(f"[CortexClient] Session created: {self.session_id}")
@@ -102,7 +114,16 @@ class CortexClient:
         return False
 
     def subscribe(self, streams, callback):
-        """Subscribe to data streams (e.g. ['com', 'met']) with live callback."""
+        """Subscribe to data streams (e.g. ['com', 'met', 'fac', 'sys']) with live callback.
+        
+        Available streams:
+        - com: Mental Commands (requires training 'neutral' first)
+        - met: Performance Metrics (eng, exc, str, rel, int, lex)
+        - fac: Facial Expressions (blink, smile, clench, eyebrow raise)
+        - mot: Motion Data (9-axis IMU)
+        - sys: System Events (headset status, training events, signal quality)
+        - eeg: Raw EEG (requires premium license)
+        """
         if not self.session_id or not self.auth_token:
             print("[CortexClient] Missing active session.")
             return False
@@ -111,7 +132,7 @@ class CortexClient:
             "cortexToken": self.auth_token,
             "session": self.session_id,
             "streams": streams
-        }, req_id=5)
+        })
         
         print(f"[CortexClient] Subscribed to streams: {streams}")
         
