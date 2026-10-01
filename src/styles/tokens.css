@@ -1,0 +1,216 @@
+/* BrainWaves Project — Design Tokens
+ * Inspired by Linear's design system (linear.app)
+ * Dark-mode-first monitoring surface
+ * Canvas: #010102  |  Accent: lavender-blue #5e6ad2
+ */
+
+:root {
+  /* ===== SURFACE LADDER ===== */
+  --surface-canvas:   #010102;
+  --surface-1:        #0f1011;
+  --surface-2:        #141516;
+  --surface-3:        #18191a;
+  --surface-4:        #191a1b;
+
+  /* ===== BORDERS ===== */
+  --border-hairline:        #23252a;
+  --border-hairline-strong: #34343a;
+  --border-hairline-tertiary: #3e3e44;
+  --border-subtle:          rgba(255, 255, 255, 0.05);
+  --border-default:         rgba(255, 255, 255, 0.08);
+
+  /* ===== TEXT ===== */
+  --text-ink:        #f7f8f8;
+  --text-muted:      #d0d6e0;
+  --text-subtle:     #8a8f98;
+  --text-tertiary:   #62666d;
+
+  /* ===== ACCENT ===== */
+  --accent:        #5e6ad2;
+  --accent-hover:  #828fff;
+  --accent-focus:  #5e69d1;
+  --accent-soft:   rgba(94, 106, 210, 0.15);
+
+  /* ===== BACKWARD-COMPAT ALIASES ===== */
+  --bg: var(--surface-canvas);
+  --panel: var(--surface-1);
+  --surface: var(--surface-4);
+  --green: var(--success);
+  --yellow: var(--warning);
+  --red: var(--error);
+  --blue: var(--accent);
+
+  /* ===== SEMANTIC (monitoring surface) ===== */
+  --success:       #27a644;
+  --success-soft:  rgba(39, 166, 68, 0.15);
+  --warning:       #eab308;
+  --warning-soft:  rgba(234, 179, 8, 0.15);
+  --error:         #ef4444;
+  --error-soft:    rgba(239, 68, 68, 0.15);
+  --info:          #5e6ad2;
+  --info-soft:     rgba(94, 106, 210, 0.15);
+
+  /* ===== OVERLAY ===== */
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  /* ===== SHADOWS (tinted to canvas hue) ===== */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  /* ===== FOCUS RING ===== */
+  --focus-ring: 2px solid rgba(94, 105, 209, 0.5);
+
+  /* ===== SPACING (4px base) ===== */
+  --space-xxs: 4px;
+  --space-xs:  8px;
+  --space-sm:  12px;
+  --space-md:  16px;
+  --space-lg:  24px;
+  --space-xl:  32px;
+  --space-xxl: 48px;
+  --space-section: 96px;
+
+  /* ===== RADII ===== */
+  --radius-xs:   4px;
+  --radius-sm:   6px;
+  --radius-md:   8px;
+  --radius-lg:   12px;
+  --radius-xl:   16px;
+  --radius-xxl:  24px;
+  --radius-pill: 9999px;
+  --radius-full: 9999px;
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-display: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-text:    'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+
+  --leading-tight:  1.05;
+  --leading-snug:   1.15;
+  --leading-normal: 1.5;
+
+  /* ===== Z-INDEX SCALE ===== */
+  --z-base:     0;
+  --z-elevated: 1;
+  --z-sticky:   10;
+  --z-overlay:  20;
+  --z-dropdown: 30;
+  --z-modal:    40;
+  --z-popover:  50;
+  --z-toast:    60;
+
+  /* ===== MOTION ===== */
+  --duration-fast:   120ms;
+  --duration-normal: 240ms;
+  --duration-slow:   400ms;
+  --easing-out:      cubic-bezier(0.16, 1, 0.3, 1);
+  --easing-in-out:   cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ===== BREAKPOINTS ===== */
+  --bp-sm:   640px;
+  --bp-md:   768px;
+  --bp-lg:   1024px;
+  --bp-xl:   1280px;
+  --bp-2xl:  1536px;
+
+  /* ===== CONTAINER ===== */
+  --container-max: 1280px;
+  --container-pad: 24px;
+}
+
+/* ===== REDUCED MOTION ===== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-fast:   0ms;
+    --duration-normal: 0ms;
+    --duration-slow:   0ms;
+  }
+}
+
+/* ===== BASE RESETS ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-text);
+  background: var(--surface-canvas);
+  color: var(--text-ink);
+  line-height: var(--leading-normal);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv01' 1, 'ss03' 1;
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--container-pad);
+}
+
+/* ===== FOCUS RINGS ===== */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-hairline-strong);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hairline-tertiary);
+}
+
+/* ===== UTILITY CLASSES ===== */
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-ink       { color: var(--text-ink); }
+.text-muted     { color: var(--text-muted); }
+.text-subtle    { color: var(--text-subtle); }
+.text-tertiary  { color: var(--text-tertiary); }
+
+.bg-canvas      { background: var(--surface-canvas); }
+.bg-surface-1   { background: var(--surface-1); }
+.bg-surface-2   { background: var(--surface-2); }
+
+.border-default { border-color: var(--border-default); }
+.border-hairline{ border-color: var(--border-hairline); }
+
+/* ===== MOTION REDUCED ===== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
