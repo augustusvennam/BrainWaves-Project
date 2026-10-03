@@ -1,36 +1,57 @@
 """
 Test script for Temi robot connectivity.
+
+No mock mode — every method hits the real HTTP gateway on the Temi robot.
+Set TEMI_DRY_RUN=1 to skip actual HTTP calls (useful for CI / offline checks).
 """
 import sys
 import os
+import time
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from src.temi_controller import TemiController
-import time
+
+DRY_RUN = os.environ.get("TEMI_DRY_RUN", "0") == "1"
+
 
 def test_temi_connection():
     print("Testing Temi robot connection...")
-    # Using mock mode by default - set mock=False when testing with real robot
     temi = TemiController(
         robot_ip="192.168.1.100",  # Change to your Temi's IP
         port=80,
-        mock=True  # Set False for real hardware test
     )
-    
+
+    if DRY_RUN:
+        print("[TEMI_DRY_RUN] Skipping real HTTP calls — validating controller wiring only.")
+
+    def run(method, *args, **kwargs):
+        if DRY_RUN:
+            print(f"[TEMI_DRY_RUN] Would call {method.__name__}({args}, {kwargs})")
+            return True
+        return method(*args, **kwargs)
+
     print("Testing speech...")
-    temi.speak("Hello from BrainWaves Project test!")
-    
+    run(temi.speak, "Hello from BrainWaves Project test!")
+
     print("Testing movement...")
-    temi.move_forward(0.3)
-    
+    run(temi.move_forward, 0.3)
+
     print("Testing turn...")
-    temi.turn(45)
-    temi.turn(-45)
-    
+    run(temi.turn, 45)
+    run(temi.turn, -45)
+
     print("Testing dance sequence...")
-    temi.perform_dance()
-    
-    print("✅ Temi test completed (in mock mode)")
+    run(temi.perform_dance)
+
+    if not DRY_RUN:
+        if temi.is_connected():
+            print("✅ Temi robot reachable and responsive.")
+        else:
+            print("⚠️  Temi test completed — robot not reachable.")
+    else:
+        print("✅ Temi test completed (dry-run mode)")
+
 
 if __name__ == "__main__":
     test_temi_connection()

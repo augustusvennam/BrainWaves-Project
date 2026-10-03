@@ -1,18 +1,34 @@
 """
 Mood and Emotional State Classifier.
-Processes real-time EEG performance metrics and frequency band powers
-to categorize affective/cognitive state (Focused, Relaxed, Excited, Stressed, Neutral).
 
-CORRECTIONS FROM REVIEW:
-- 'met' stream at basic 0.1 Hz rate gives ~1-2 samples per 15s window — insufficient for reliable mood.
-- Metrics need warm-up time before they stabilize.
-- This is a HEURISTIC, not validated emotion detection. Label accordingly.
-- Correct metric names: eng, exc, str, rel, int, lex (not just rel/foc)
+Reads Emotiv Cortex `met` (performance metrics) and maps the six scalar
+signals to a small set of affective/cognitive labels:
+    Focused, Relaxed, Excited, Stressed, Neutral.
+
+IMPORTANT — this is a HEURISTIC, not validated emotion detection.
+At the basic 0.1 Hz license rate you get ~1-2 samples per 15s window,
+so results are best presented as "likely state", not "detected emotion".
 """
+
 import time
 
+
 class MoodDeterminer:
+    """Heuristic classifier for Cortex `met` performance metrics.
+
+    Responsibilities:
+      - Track a rolling history of metric samples.
+      - Enforce a warm-up period before classifying.
+      - Convert raw metrics to a mood label + confidence score.
+    """
+
     def __init__(self, window_size=3, warmup_seconds=5.0):
+        """Create a classifier.
+
+        Args:
+            window_size: Number of metric samples to keep for smoothing.
+            warmup_seconds: Seconds to wait before `is_ready()` returns True.
+        """
         self.window_size = window_size
         self.warmup_seconds = warmup_seconds
         self.history = []
@@ -25,20 +41,19 @@ class MoodDeterminer:
         print("[MoodDeterminer] Session started. Warmup period: {:.1f}s".format(self.warmup_seconds))
 
     def is_ready(self):
-        """Check if enough warmup time has passed for reliable metrics."""
+        """Return True once the warm-up period has elapsed since `start_session()`."""
         if self.start_time is None:
             return False
         return (time.time() - self.start_time) >= self.warmup_seconds
 
     def classify_from_metrics(self, metrics_data):
-        """
-        Classify mood from Emotiv 'met' performance metrics.
-        metrics_data: dictionary with keys: eng, exc, str, rel, int, lex
-        Values are scaled 0.0 to 1.0.
-        
-        NOTE: This is a HEURISTIC, not validated emotion detection.
-        At basic 0.1 Hz license rate, you get ~1-2 samples per 15s window.
-        Results should be presented as "likely state" not "detected emotion".
+        """Classify mood from one Cortex `met` sample.
+
+        Accepts either a dict (`{"eng": 0.5, ...}`) or a list
+        (`[eng, exc, str, rel, int, lex]` — the standard Cortex order).
+
+        Returns a dict with keys:
+            primary_mood, confidence, scores, raw, is_heuristic, sample_rate_hz
         """
         if not metrics_data:
             return {"primary_mood": "Neutral", "confidence": 0.5, "scores": {}}

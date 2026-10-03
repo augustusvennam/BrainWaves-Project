@@ -11,6 +11,7 @@ CRITICAL NOTES (from review):
 - Mental commands require 'neutral' baseline training first
 """
 import json
+import queue
 import ssl
 import time
 import threading
@@ -26,8 +27,17 @@ class CortexClient:
         self.session_id = None
         self.headset_id = None
         self.is_connected = False
+        # Per-stream handlers: {"com": handler, "met": handler, ...}
+        # Registered via subscribe(); dispatched by the listener thread.
         self.message_handlers = {}
         self._req_counter = 0
+        # The listener thread is the ONLY reader of the websocket. Request
+        # responses are delivered through these per-id queues so _send_request
+        # never calls ws.recv() itself (which would race with the listener).
+        self._pending = {}
+        self._req_lock = threading.Lock()
+        self._stop_listening = threading.Event()
+        self._listener_thread = None
 
     def connect(self):
         """Connect to local Cortex WebSocket server.
@@ -41,6 +51,13 @@ class CortexClient:
             )
             self.is_connected = True
             print("[CortexClient] Connected successfully.")
+            # Single reader thread — started here so _send_request never
+            # races its own ws.recv() against this loop's ws.recv().
+            self._stop_listening.clear()
+            self._listener_thread = threading.Thread(
+                target=self._listen_loop, daemon=True
+            )
+            self._listener_thread.start()
             return True
         except Exception as e:
             print(f"[CortexClient] Connection failed: {e}")
@@ -48,17 +65,39 @@ class CortexClient:
             return False
 
     def _send_request(self, method, params=None):
-        """Send JSON-RPC request and return parsed response."""
-        self._req_counter += 1
+        """Send a JSON-RPC request and block on its response via the listener.
+
+        Raises RuntimeError if Cortex does not reply within the timeout.
+        """
+        with self._req_lock:
+            self._req_counter += 1
+            req_id = self._req_counter
+            q = queue.Queue()
+            self._pending[req_id] = q
+
         payload = {
             "jsonrpc": "2.0",
             "method": method,
             "params": params or {},
-            "id": self._req_counter
+            "id": req_id
         }
-        self.ws.send(json.dumps(payload))
-        resp = self.ws.recv()
-        return json.loads(resp)
+        try:
+            self.ws.send(json.dumps(payload))
+        except Exception as e:
+            with self._req_lock:
+                self._pending.pop(req_id, None)
+            raise RuntimeError(f"Cortex send failed: {e}") from e
+
+        try:
+            resp = q.get(timeout=10)
+        except queue.Empty:
+            with self._req_lock:
+                self._pending.pop(req_id, None)
+            raise RuntimeError("Cortex request timed out")
+        finally:
+            with self._req_lock:
+                self._pending.pop(req_id, None)
+        return resp
 
     def authenticate(self):
         """Perform full handshake: check info, request access, get auth token."""
@@ -113,9 +152,17 @@ class CortexClient:
         print(f"[CortexClient] Failed to create session: {resp}")
         return False
 
-    def subscribe(self, streams, callback):
-        """Subscribe to data streams (e.g. ['com', 'met', 'fac', 'sys']) with live callback.
-        
+    def register_handler(self, stream, handler):
+        """Register a callback for one stream type, e.g. register_handler('met', fn)."""
+        self.message_handlers[stream] = handler
+
+    def subscribe(self, streams, handlers=None):
+        """Subscribe to data streams and register per-stream handlers.
+
+        streams: list of stream names, e.g. ['com', 'met', 'fac', 'sys']
+        handlers: optional dict of {stream_name: handler(payload)}.
+            If omitted, messages are dispatched to self.message_handlers.
+
         Available streams:
         - com: Mental Commands (requires training 'neutral' first)
         - met: Performance Metrics (eng, exc, str, rel, int, lex)
@@ -127,31 +174,80 @@ class CortexClient:
         if not self.session_id or not self.auth_token:
             print("[CortexClient] Missing active session.")
             return False
-            
-        resp = self._send_request("subscribe", {
-            "cortexToken": self.auth_token,
-            "session": self.session_id,
-            "streams": streams
-        })
-        
-        print(f"[CortexClient] Subscribed to streams: {streams}")
-        
-        def _listen_loop():
-            while self.is_connected:
-                try:
-                    data = json.loads(self.ws.recv())
-                    callback(data)
-                except Exception as e:
-                    print(f"[CortexClient] Listener error: {e}")
-                    break
 
-        thread = threading.Thread(target=_listen_loop, daemon=True)
-        thread.start()
+        # Merge caller-supplied handlers into the registry so the single
+        # listener thread can route every stream to its owner.
+        if handlers:
+            for stream, handler in handlers.items():
+                self.register_handler(stream, handler)
+
+        try:
+            resp = self._send_request("subscribe", {
+                "cortexToken": self.auth_token,
+                "session": self.session_id,
+                "streams": streams
+            })
+        except RuntimeError as e:
+            print(f"[CortexClient] Subscribe request failed: {e}")
+            return False
+
+        print(f"[CortexClient] Subscribed to streams: {streams}")
         return True
 
+    def _listen_loop(self):
+        """Single reader for the websocket.
+
+        Routes each message: JSON-RPC responses (have an 'id') go to the
+        waiting sender's queue; stream data (have a 'type' and 'sid') goes
+        to the registered handler for that stream type.
+        """
+        while not self._stop_listening.is_set():
+            try:
+                data = json.loads(self.ws.recv())
+            except Exception as e:
+                print(f"[CortexClient] Listener error: {e}")
+                break
+            try:
+                self._route(data)
+            except Exception as e:
+                print(f"[CortexClient] Routing error: {e}")
+
+    def _route(self, data):
+        """Dispatch one Cortex message to either the sender or a stream handler."""
+        if not isinstance(data, dict):
+            return
+
+        # 1. JSON-RPC response to a pending request (has an 'id').
+        if "id" in data:
+            req_id = data["id"]
+            with self._req_lock:
+                q = self._pending.get(req_id)
+            if q is not None:
+                q.put(data)
+            return
+
+        # 2. Stream data — route to the handler for its stream type, but
+        #    only if the message belongs to our session (sid match).
+        stream_type = data.get("type")
+        if stream_type is None:
+            return
+        if data.get("sid") != self.session_id:
+            return
+        handler = self.message_handlers.get(stream_type)
+        if handler is None:
+            return
+        try:
+            handler(data)
+        except Exception as e:
+            print(f"[CortexClient] Handler error for '{stream_type}': {e}")
+
     def close(self):
-        """Cleanly close connection."""
+        """Cleanly close connection and stop the listener thread."""
+        self._stop_listening.set()
         self.is_connected = False
         if self.ws:
-            self.ws.close()
+            try:
+                self.ws.close()
+            except Exception:
+                pass
             print("[CortexClient] Closed connection.")

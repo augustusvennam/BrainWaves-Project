@@ -29,8 +29,9 @@
   - `eng` (Engagement)
   - `exc` (Excitement)
   - `str` (Stress)
-  - `rel` (Relaxation / Interest)
-  - `foc` (Focus / Attention)
+  - `rel` (Relaxation)
+  - `int` (Interest)
+  - `lex` (Long-term Excitement)
 
 ---
 

@@ -5,9 +5,14 @@
 # Register a Cortex App at: https://www.emotiv.com/my-account/ → Cortex Apps
 # This is a DASHBOARD step — can be done before the headset arrives.
 emotiv:
-  client_id: "YOUR_CREDENTIALS_CLIENT_ID_HERE"
-  client_secret: "YOUR_CREDENTIALS_CLIENT_SECRET_HERE"
-  websocket_url: "wss://localhost:6868"  # Local Cortex service only
+  client_id: "H2JRJnsLnhb3Jx6f8xXUQM6yJZWFAYjFf4eLZiEw"
+  client_secret: "70TbSpeDrIQlpqRC5pTApbKP426XJby2AEG5QS1W7gDcG4fAWWk2eScf3QfCyKSekMMkzT9uOj3KIkuiMaCTcQkOMGIDiq2zin7MpoDxc8IjoSBybrApyEQnZbjc6Xmc"
+  websocket_url: "wss://localhost:6868"  # Local Cortex service — confirmed running
+  # Verified addresses (from netstat):
+  #   IPv4: wss://127.0.0.1:6868
+  #   IPv6: wss://[::1]:6868
+  #   State: LISTENING on 0.0.0.0:6868 and [::]:6868
+  #   Active connection: [::1]:62467 → [::1]:6868 (Emotiv Launcher ↔ Cortex)
   app_name: "BrainBot"
 
 # EEG / Brainwave settings

@@ -1,0 +1,8 @@
+# Local secrets and environment-specific settings
+config/settings.yaml
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/

@@ -1,7 +1,6 @@
 /**
  * BrainWaves Project — BrainBot Dashboard
- * Production-quality monitoring UI with Linear design system, taste-skill principles,
- * and Vercel Web Interface Guidelines compliance.
+ * Real-time EEG monitoring UI with Linear design system.
  *
  * Architecture: EPOC X → Cortex API → Python brainbot_main.py → Temi Robot
  *
@@ -9,9 +8,13 @@
  *   - `com` (mental commands)
  *   - `met` (mood metrics)
  *   - `sys` (system events)
+ *
+ * The dashboard connects to a local Python WebSocket server for live data.
+ * Run `python src/brainbot_main.py` to start the backend.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { Server, Bot, Brain } from 'lucide-react';
 import {
   Button,
   Badge,
@@ -24,6 +27,7 @@ import {
   SectionTitle,
   SectionSubtitle,
   ArchitectureDiagram,
+  EEGDashboard,
 } from './components/ui';
 import { type ReactNode } from 'react';
 
@@ -68,8 +72,8 @@ const defaultLogs = [
  *
  * Sections (mobile-first, breakpoints 640/768/1024/1280):
  *  1. Header — project name + live connection status badges
- *  2. Project Progress — 6 milestone cards with status transitions
- *  3. System Status — 3 monitors (Cortex API, Temi Robot, Mood Engine)
+ *  2. Real-Time EEG Dashboard — live metric graphs + system monitors
+ *  3. Project Progress — 6 milestone cards with status transitions
  *  4. Activity Log — timestamped, color-coded entries (info/warn/error)
  *  5. Architecture Diagram — horizontal flow: EPOC X → Cortex → Python → Temi
  */
@@ -93,13 +97,18 @@ function App() {
               </h1>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <Badge label="Dashboard Ready" variant="online" dot={false} />
+              <Badge label="Localhost" variant="info" dot={false} />
               {monitors.map((m) => (
                 <Badge key={m.id} label={m.status} variant={statusVariant(m.status)} dot={false} />
               ))}
             </div>
           </div>
         </header>
+
+        {/* ===== REAL-TIME EEG DASHBOARD ===== */}
+        <section className="mb-8">
+          <EEGDashboard wsUrl="ws://localhost:8080" />
+        </section>
 
         {/* ===== PROJECT PROGRESS ===== */}
         <section className="mb-6">
