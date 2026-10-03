@@ -1,12 +1,8 @@
-#!/bin/bash
-# BrainWaves Project Environment Setup
-
-echo "Setting up Python virtual environment..."
-python -m venv venv
-source venv/Scripts/activate
-
-echo "Installing dependencies..."
-pip install -r requirements.txt
-
-echo "Setup complete. To run scripts, use:"
-echo "source venv/Scripts/activate"
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements-dev.txt
+npm install
+if [ ! -f .env ]; then cp .env.example .env; fi
+printf '\nSetup complete. Edit .env, then run npm run dev.\n'

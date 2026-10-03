@@ -1,74 +1,45 @@
-# BrainWaves Project — Research & Technical Background
+# Cortex integration reference
 
-## 1. Emotiv EPOC X & Cortex API Overview
+This document describes the implemented integration. The subscription response, rather than a guessed channel or metric order, is authoritative.
 
-### Hardware Highlights
-- **Channels:** 14 EEG channels (AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, AF4) + 2 references (CMS/DRL)
-- **Sampling Rate:** 128 Hz or 256 Hz
-- **Sensors:** Saline-soaked felt pads (rehydrated with distilled water)
-- **Connectivity:** Bluetooth 5.0 or 2.4 GHz USB Dongle
-- **Motion Sensors:** 9-axis IMU (gyroscope, accelerometer, magnetometer)
+## Connection
 
-### Software & API Access
-- **Emotiv Launcher:** Central app required to manage device connection and user profile login.
-- **Cortex API (v2/v4):** WebSocket + JSON-RPC 2.0 interface running locally at `wss://localhost:6868` or remote `wss://emotiv.com:9000`.
-- **Authentication Flow:**
-  1. `getCortexInfo` → Verify Cortex service is running
-  2. `requestAccess` → User grants permission in Launcher UI
-  3. `authorize` → Exchange Client ID/Secret for auth token
-  4. `queryHeadsets` → Find connected EPOC X
-  5. `createSession` → Start active session with headset
-  6. `subscribe` → Streams: `eeg`, `mot` (motion), `com` (mental commands), `fac` (facial expressions), `met` (performance metrics / mood)
+Cortex uses local WSS and JSON-RPC. This application accepts only loopback Cortex hosts. Its self-signed certificate can be trusted explicitly through `CORTEX_CA_CERT`; the default bypass is restricted to local Cortex.
 
-### Mental Commands (`com` stream)
-- Supported commands: `neutral`, `push`, `pull`, `lift`, `drop`, `left`, `right`, `rotate_clockwise`, `rotate_counter_clockwise`, `rotate_forwards`, `rotate_backwards`, `disappear`
-- Requires calibration via Launcher or Cortex API (`training` method)
+Startup requests access, discovers an already-connected headset, authorizes the app, creates a session, then subscribes. Default sessions are opened without license activation. `CORTEX_ACTIVATE_SESSION=true` requests a one-session license debit and activates the session for licensed streams; this may consume quota. Authorization occurs after headset discovery so waiting for hardware does not repeatedly debit a license. Users approve app access in Launcher. Credentials and tokens remain on the Python side. RPC IDs distinguish replies from notifications on the shared socket.
 
-### Mood / Performance Metrics (`met` stream)
-- Metrics provided at 0.1 Hz (basic) or 2 Hz (premium):
-  - `eng` (Engagement)
-  - `exc` (Excitement)
-  - `str` (Stress)
-  - `rel` (Relaxation / Interest)
-  - `foc` (Focus / Attention)
+- [Cortex API](https://emotiv.gitbook.io/cortex-api)
+- [Session activation and licensing](https://emotiv.gitbook.io/cortex-api/session)
+- [Authorization and debit](https://emotiv.gitbook.io/cortex-api/authentication/authorize)
+- [Request access](https://emotiv.gitbook.io/cortex-api/authentication/requestaccess)
+- [Data subscription](https://emotiv.gitbook.io/cortex-api/data-subscription)
+- [Subscription result and columns](https://emotiv.gitbook.io/cortex-api/data-subscription/subscribe)
+- [Sample formats and units](https://emotiv.gitbook.io/cortex-api/data-subscription/data-sample-object)
+- [Mental command training](https://emotiv.gitbook.io/cortex-api/bci/training)
 
----
+## Stream interpretation
 
-## 2. Temi Robot SDK & API Integration
+| Stream | Actual data | Application behavior |
+|---|---|---|
+| `eeg` | Sensor amplitudes in µV plus metadata | Extract known sensor labels; plot unfiltered amplitudes, count interpolation flags |
+| `pow` | `SENSOR/BAND` values in µV²/Hz | Display Cortex values, no locally invented bands |
+| `met` | Metric values and `.isActive` flags | Display active finite values from 0–1; unavailable stays null |
+| `com` | `act` string and `pow` from 0–1 | Display command/power, no automatic motion |
+| `dev` | Battery, wireless signal, nested sensor contact quality | Flatten nested labels using their subscription schema |
+| `eq` | Battery percentage, overall EEG quality, sample-rate quality, sensor quality | Display original labels/scales |
+| `sys` | Training detection/event messages | Retain latest sample; this is not the signal-quality stream |
+| `fac`, `mot` | Facial-expression or motion values | Optional subscription/transport support; no dedicated visualization yet |
 
-### Communication Protocol
-- Temi runs Android with the **temi Android SDK**.
-- For external control from Python/Node.js, we use a lightweight **HTTP/WebSocket gateway server** running on Temi or an intermediary bridge.
+An EPOC X commonly supplies AF3, F7, F3, FC5, T7, P7, O1, O2, P8, T8, FC6, F4, F8, and AF4. The application reads labels from the subscription and displays only sensors actually present. Sampling depends on headset settings; no fixed receive rate is imposed by the application.
 
-### Supported Actions
-- `move_forward(distance_m)`
-- `turn_left(angle_deg)` / `turn_right(angle_deg)`
-- `speak(text)`
-- `dance()` (predefined movement sequence)
-- `go_to(location_name)`
+Metric schemas may contain active flags interleaved with values and vary by headset/version. Do not map a six-element list to guessed metric names. Null metrics can indicate poor EEG quality. Interest (`int`) and relaxation (`rel`) are separate metrics; attention is used only if the stream actually supplies it.
 
----
+Cortex band definitions are theta 4–8 Hz, alpha 8–12 Hz, betaL 12–16 Hz, betaH 16–25 Hz, and gamma 25–45 Hz. These estimates use a two-second window. Delta is not supplied. No FFT-derived Delta or Gamma calculation is implemented locally.
 
-## 3. Demo Flow: "BrainBot: Can you control a robot with your brain?"
+Stream availability and rates depend on model, settings, and license. Raw EEG requires paid access. Partial subscription failures are reported without fabricating replacements. Consult the actual account/license and current vendor documentation before choosing streams.
 
-1. **Introduction / Calibration (60 seconds)**
-   - Visitor puts on EPOC X.
-   - App checks signal quality across all 14 channels.
-   - Visitor completes a 10-second baseline focus / mental command training (`push` or `focus`).
+## Boundaries
 
-2. **Mood Assessment (15 seconds)**
-   - App reads real-time performance metrics (`met` stream).
-   - Classifies mood: *Focused*, *Relaxed*, *Excited*, or *Stressed*.
-   - Temi speaks: *"Welcome! I detect you are feeling [Mood] right now."*
+Physical headset pairing and electrode preparation are handled using Emotiv software/instructions. Participant mental-command training is handled in EmotivBCI. The backend discovers an already-connected device; it does not pair hardware or choose/load a training profile.
 
-3. **Mental Command Control (30 seconds)**
-   - Visitor thinks `PUSH` or concentrates deeply.
-   - Real-time power/command meter fills up on the display.
-   - Once threshold (> 0.6) is crossed, command triggers Temi.
-
-4. **Robot Action Execution**
-   - **Low Focus / Neutral:** Temi turns left and right, asking for more concentration.
-   - **Medium Focus:** Temi moves forward 1 meter.
-   - **High Focus / Strong Push:** Temi performs a short victory dance!
-
-5. **Reset & Next Visitor**
+Every sample must match the active session, contain a finite timestamp, and match its schema. EEG samples with invalid amplitudes are rejected. Performance metrics with inactive or invalid values become unavailable. Short-lived sample history is for visualization, not clinical interpretation or lossless recording.
