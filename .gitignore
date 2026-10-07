@@ -1,8 +1,35 @@
 # Local secrets and environment-specific settings
 config/settings.yaml
+config/settings.local.yaml
+config/*.local.yaml
 .env
 .env.*
+*.secret
+*.secret.*
+credentials/
+*.token
 *.pem
 *.key
 *.crt
 secrets/
+
+# Installed frontend dependencies
+node_modules/
+
+# Python and frontend build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+dist/
+coverage/
+
+# Local runtime output
+*.log
+*.sqlite
+*.db
+
+# Editor and operating-system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

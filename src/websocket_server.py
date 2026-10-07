@@ -16,14 +16,13 @@ The server will:
 """
 import asyncio
 import json
-import ssl
 import logging
-import time
 from datetime import datetime
 from websockets.server import serve
 from src.config import load_config
 from src.mood_determiner import MoodDeterminer
 from src.cortex_api_client import CortexClient
+from src.temi_controller import TemiController
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,6 +35,7 @@ class EEGWebSocketServer:
         self.config = load_config()
         self.emotiv_cfg = self.config['emotiv']
         self.mood_cfg = self.config['mood']
+        self.temi_cfg = self.config['temi']
 
         # Initialize Cortex client
         self.cortex_client = CortexClient(
@@ -46,14 +46,21 @@ class EEGWebSocketServer:
 
         # Initialize mood detector
         self.mood_detector = MoodDeterminer(window_size=self.mood_cfg['window_seconds'])
+        self.temi = TemiController(
+            robot_ip=self.temi_cfg['robot_ip'],
+            port=self.temi_cfg['port'],
+        )
 
         # State
         self.current_metrics = {}
         self.current_command = None
         self.current_mood = 'Neutral'
         self.current_focus = 0.0
+        self.current_eeg = []
+        self.temi_connected = False
+        self._event_loop = None
 
-    async def connect(self):
+    def connect(self):
         """Connect to Cortex and start streaming."""
         logger.info("Connecting to Cortex...")
 
@@ -77,15 +84,27 @@ class EEGWebSocketServer:
             self.cortex_client.close()
             return False
 
-        if not self.cortex_client.subscribe(['com', 'met', 'sys']):
-            logger.error("Failed to subscribe to streams")
-            self.cortex_client.close()
-            return False
+        self.temi_connected = self.temi.is_connected()
+        if self.temi_connected:
+            logger.info("Temi WebSocket connected")
+        else:
+            logger.warning("Temi WebSocket is not reachable")
 
         # Register handlers
         self.cortex_client.register_handler('com', self._handle_command)
         self.cortex_client.register_handler('met', self._handle_metrics)
         self.cortex_client.register_handler('sys', self._handle_system)
+        self.cortex_client.register_handler('eeg', self._handle_eeg)
+
+        if not self.cortex_client.subscribe(['com', 'met', 'sys']):
+            logger.error("Failed to subscribe to streams")
+            self.cortex_client.close()
+            return False
+        try:
+            if not self.cortex_client.subscribe(['eeg']):
+                logger.warning("Raw EEG unavailable; showing derived metrics only")
+        except Exception as error:
+            logger.warning("Raw EEG unavailable (%s); showing derived metrics only", error)
 
         logger.info(f"Connected to headset: {headset_id}")
         return True
@@ -99,11 +118,12 @@ class EEGWebSocketServer:
                 self.current_command = command
                 logger.info(f"Command: {command} (power: {power:.2f})")
 
-                # Broadcast to all WebSocket clients
-                self.broadcast({
+                self._schedule_broadcast({
                     'type': 'com',
-                    'command': command,
-                    'power': power,
+                    'data': {
+                        'command': command,
+                        'power': power,
+                    },
                     'timestamp': datetime.now().isoformat()
                 })
         except Exception as e:
@@ -121,14 +141,16 @@ class EEGWebSocketServer:
                 self.current_mood = result['primary_mood']
                 self.current_focus = result['scores']['Focused']
 
-                # Broadcast to all WebSocket clients
-                self.broadcast({
+                self._schedule_broadcast({
                     'type': 'met',
-                    'metrics': metrics,
-                    'mood': self.current_mood,
-                    'focus': self.current_focus,
-                    'scores': result['scores'],
-                    'raw': result['raw'],
+                    'data': {
+                        **metrics,
+                        'metrics': metrics,
+                        'primary_mood': self.current_mood,
+                        'focus_level': self.current_focus,
+                        'scores': result['scores'],
+                        'raw': result['raw'],
+                    },
                     'timestamp': datetime.now().isoformat()
                 })
         except Exception as e:
@@ -141,13 +163,49 @@ class EEGWebSocketServer:
                 event = data['sys']
                 logger.info(f"System event: {event.get('type')}")
 
-                self.broadcast({
+                self._schedule_broadcast({
                     'type': 'sys',
-                    'event': event,
+                    'data': {
+                        'event': event,
+                    },
                     'timestamp': datetime.now().isoformat()
                 })
         except Exception as e:
             logger.error(f"Error handling system event: {e}")
+
+    def _handle_eeg(self, data):
+        """Forward a compact raw EEG sample for BrainViz-style rendering."""
+        sample = data.get('eeg')
+        if not isinstance(sample, list):
+            return
+        numeric = [value for value in sample if isinstance(value, (int, float))]
+        if not numeric:
+            return
+        self.current_eeg = numeric[-14:]
+        self._schedule_broadcast({
+            'type': 'eeg',
+            'data': {'sample': self.current_eeg},
+            'timestamp': datetime.now().isoformat(),
+        })
+
+    def _schedule_broadcast(self, message):
+        """Schedule a broadcast from Cortex's background listener thread."""
+        if self._event_loop is None or self._event_loop.is_closed():
+            logger.warning("Dropping WebSocket message because the server loop is unavailable")
+            return
+
+        future = asyncio.run_coroutine_threadsafe(
+            self.broadcast(message),
+            self._event_loop,
+        )
+        future.add_done_callback(self._log_broadcast_failure)
+
+    @staticmethod
+    def _log_broadcast_failure(future):
+        try:
+            future.result()
+        except Exception as error:
+            logger.error(f"WebSocket broadcast failed: {error}")
 
     async def broadcast(self, message):
         """Send message to all connected WebSocket clients."""
@@ -174,10 +232,15 @@ class EEGWebSocketServer:
         # Send initial state
         await websocket.send(json.dumps({
             'type': 'state',
-            'mood': self.current_mood,
-            'focus': self.current_focus,
-            'command': self.current_command,
-            'metrics': self.current_metrics,
+            'data': {
+                **self.current_metrics,
+                'metrics': self.current_metrics,
+                'primary_mood': self.current_mood,
+                'focus_level': self.current_focus,
+                'command': self.current_command,
+                'temi_connected': self.temi_connected,
+                'eeg_available': bool(self.current_eeg),
+            },
             'timestamp': datetime.now().isoformat()
         }))
 
@@ -197,25 +260,30 @@ class EEGWebSocketServer:
         """Start the WebSocket server."""
         logger.info(f"Starting WebSocket server on ws://{self.host}:{self.port}")
 
-        # Connect to Cortex (blocking call)
-        if not asyncio.run(self.connect()):
-            logger.error("Failed to connect to Cortex. Exiting.")
-            return
-
-        logger.info("Cortex connected. Starting WebSocket server...")
-
         async def main():
+            self._event_loop = asyncio.get_running_loop()
+
+            # CortexClient uses blocking I/O and invokes handlers from its
+            # listener thread, so keep it off the WebSocket event loop.
+            if not await asyncio.to_thread(self.connect):
+                logger.error("Failed to connect to Cortex. Exiting.")
+                return
+
+            logger.info("Cortex connected. Starting WebSocket server...")
             async with serve(self.handler, self.host, self.port):
                 logger.info(f"WebSocket server running on ws://{self.host}:{self.port}")
                 await asyncio.Future()  # run forever
 
-        asyncio.run(main())
+            self._event_loop = None
+
+        try:
+            asyncio.run(main())
+        finally:
+            self._event_loop = None
 
     def close(self):
         """Clean shutdown."""
         self.cortex_client.close()
-        for client in list(self.clients):
-            asyncio.create_task(client.close())
         logger.info("Server shutdown complete")
 
 

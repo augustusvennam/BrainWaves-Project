@@ -10,7 +10,7 @@
  *   ws.send({ type: 'subscribe', streams: ['com', 'met', 'sys'] });
  */
 
-export type StreamType = 'com' | 'met' | 'sys';
+export type StreamType = 'com' | 'met' | 'sys' | 'eeg' | 'state';
 
 export interface CortexMessage {
   type: StreamType;
@@ -21,7 +21,7 @@ export interface WebSocketService {
   connect(url: string): void;
   disconnect(): void;
   send(message: unknown): void;
-  onMessage(callback: (message: CortexMessage) => void): void;
+  onMessage(callback: (message: CortexMessage) => void): () => void;
   onConnect(callback: () => void): void;
   onDisconnect(callback: () => void): void;
   onError(callback: (error: Event) => void): void;
@@ -111,8 +111,11 @@ class WebSocketServiceImpl implements WebSocketService {
     }
   }
 
-  onMessage(callback: (message: CortexMessage) => void): void {
+  onMessage(callback: (message: CortexMessage) => void): () => void {
     this.messageCallbacks.push(callback);
+    return () => {
+      this.messageCallbacks = this.messageCallbacks.filter((registered) => registered !== callback);
+    };
   }
 
   onConnect(callback: () => void): void {

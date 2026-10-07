@@ -23,8 +23,9 @@ import {
   ResponsiveContainer,
   ReferenceDot,
 } from 'recharts';
-import { Card, CardHeader, CardBody } from './Card';
+import Card, { CardHeader, CardBody } from './Card';
 import { SectionTitle } from './SectionTitle';
+import { CortexMessage, websocketService } from '../../services/websocket';
 
 interface DataPoint {
   time: string;
@@ -76,17 +77,21 @@ export function EEGGraph({
       });
     };
 
+    const handleMessage = (message: CortexMessage) => {
+      if (message.type !== 'met' && message.type !== 'state') return;
+      const value = message.data[metric];
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        handleMetric(value);
+      }
+    };
+
     subscriptionRef.current = handleMetric;
-    // In a real app, you'd wire this to the WebSocket service:
-    // websocketService.onMessage((msg) => {
-    //   if (msg.type === 'met' && msg.data[metric] !== undefined) {
-    //     handleMetric(msg.data[metric]);
-    //   }
-    // });
+    const unsubscribe = websocketService.onMessage(handleMessage);
 
     return () => {
       isMounted = false;
       subscriptionRef.current = null;
+      unsubscribe();
     };
   }, [metric, maxPoints]);
 

@@ -9,17 +9,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  Card,
-  CardHeader,
-  CardBody,
-  Monitor,
-  Badge,
-  SectionTitle,
-  SectionSubtitle,
-  EEGGraph,
-  EEG_METRICS,
-} from '.';
+import Card, { CardHeader, CardBody } from './Card';
+import Badge from './Badge';
+import Monitor from './Monitor';
+import { SectionTitle } from './SectionTitle';
+import { SectionSubtitle } from './SectionSubtitle';
+import { EEGGraph, EEG_METRICS } from './EEGGraph';
 import { websocketService } from '../../services/websocket';
 import { Brain, Server, Bot, Activity } from 'lucide-react';
 
@@ -30,6 +25,7 @@ interface MonitorState {
   title: string;
   status: MonitorStatus;
   detail: string;
+  icon: React.ReactNode;
 }
 
 const defaultMonitors: MonitorState[] = [
@@ -50,8 +46,8 @@ const defaultMonitors: MonitorState[] = [
   {
     id: 'temi',
     title: 'Temi Robot Connection',
-    status: 'offline',
-    detail: 'Waiting for Temi on network...',
+    status: 'connecting',
+    detail: 'Checking Temi WebSocket...',
     icon: <Bot className="h-5 w-5" />,
   },
 ];
@@ -65,6 +61,8 @@ export function EEGDashboard({ wsUrl = 'ws://localhost:8080' }: EEGDashboardProp
   const [connected, setConnected] = useState(false);
   const [mood, setMood] = useState<string>('Neutral');
   const [focus, setFocus] = useState<number>(0);
+  const [eegSamples, setEegSamples] = useState<number[]>([]);
+  const [eegAvailable, setEegAvailable] = useState(false);
 
   // Update a single monitor by id
   const updateMonitor = useCallback((id: string, updates: Partial<MonitorState>) => {
@@ -98,6 +96,7 @@ export function EEGDashboard({ wsUrl = 'ws://localhost:8080' }: EEGDashboardProp
       if (!isMounted) return;
 
       switch (message.type) {
+        case 'state':
         case 'met':
           if (message.data.primary_mood) {
             setMood(String(message.data.primary_mood));
@@ -109,7 +108,30 @@ export function EEGDashboard({ wsUrl = 'ws://localhost:8080' }: EEGDashboardProp
           if (message.data.focus_level !== undefined) {
             setFocus(Number(message.data.focus_level));
           }
+          if (message.data.temi_connected !== undefined) {
+            const temiConnected = Boolean(message.data.temi_connected);
+            updateMonitor('temi', {
+              status: temiConnected ? 'online' : 'offline',
+              detail: temiConnected
+                ? 'Connected to temi-woz-android'
+                : 'Temi WebSocket is unreachable',
+            });
+          }
+          if (message.data.eeg_available !== undefined) {
+            setEegAvailable(Boolean(message.data.eeg_available));
+          }
           break;
+        case 'eeg': {
+          const sample = message.data.sample;
+          if (Array.isArray(sample)) {
+            const values = sample.filter((value): value is number => typeof value === 'number');
+            if (values.length > 0) {
+              setEegSamples(values);
+              setEegAvailable(true);
+            }
+          }
+          break;
+        }
 
         case 'sys':
           if (message.data.type === 'connectionLost') {
@@ -191,6 +213,36 @@ export function EEGDashboard({ wsUrl = 'ws://localhost:8080' }: EEGDashboardProp
               threshold={metric.threshold}
             />
           ))}
+        </div>
+      </section>
+
+      <section>
+        <SectionTitle>Live EEG Signal</SectionTitle>
+        <SectionSubtitle>
+          {eegAvailable
+            ? 'Raw channel sample from the EPOC X headset'
+            : 'Raw EEG is unavailable; enable the Cortex raw EEG license to display the signal'}
+        </SectionSubtitle>
+        <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-1)] p-4">
+          {eegSamples.length > 1 ? (
+            <svg viewBox="0 0 700 180" className="w-full" role="img" aria-label="Live EEG signal">
+              <polyline
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="2"
+                points={eegSamples.map((value, index) => {
+                  const min = Math.min(...eegSamples);
+                  const max = Math.max(...eegSamples);
+                  const range = max - min || 1;
+                  return `${(index / (eegSamples.length - 1)) * 700},${170 - ((value - min) / range) * 150}`;
+                }).join(' ')}
+              />
+            </svg>
+          ) : (
+            <div className="py-8 text-center text-sm text-[var(--text-subtle)]">
+              Waiting for raw EEG samples from Cortex…
+            </div>
+          )}
         </div>
       </section>
 

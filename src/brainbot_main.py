@@ -12,7 +12,6 @@ import sys
 from src.config import load_config
 from src.cortex_api_client import CortexClient
 from src.mood_determiner import MoodDeterminer
-from src.temi_controller import TemiController
 
 class BrainBot:
     def __init__(self):
@@ -20,7 +19,6 @@ class BrainBot:
         self.emotiv_cfg = self.config["emotiv"]
         self.eeg_cfg = self.config["eeg"]
         self.mood_cfg = self.config["mood"]
-        self.temi_cfg = self.config["temi"]
         self.interact_cfg = self.config["interaction"]
         
         self.cortex_client = CortexClient(
@@ -30,11 +28,6 @@ class BrainBot:
         )
         
         self.mood_detector = MoodDeterminer(window_size=self.mood_cfg["window_seconds"])
-        self.temi = TemiController(
-            robot_ip=self.temi_cfg["robot_ip"],
-            port=self.temi_cfg["port"]
-        )
-        
         # State tracking
         self.is_running = False
         self.last_mental_command = "neutral"
@@ -46,16 +39,6 @@ class BrainBot:
         self.focus_threshold_high = 0.7
         self.focus_threshold_med = 0.4
         
-        # Register callbacks via subscription
-        self.cortex_client.subscribe(
-            streams=['com', 'met', 'sys'],
-            handlers={
-                'com': self._on_mental_command,
-                'met': self._on_performance_metrics,
-                'sys': self._on_system_event
-            }
-        )
-
     # ----- Cortex Event Handlers -----
     def _on_mental_command(self, data):
         """Handle incoming mental command data stream."""
@@ -89,10 +72,8 @@ class BrainBot:
                 event = data['sys']
                 if event.get('type') == 'connectionLost':
                     print("[BrainBot] WARNING: Headset connection lost!")
-                    self.temi.speak("Warning: EEG connection lost. Please reconnect.")
                 elif event.get('type') == 'batteryLevel' and event.get('level', 100) < 20:
                     print("[BrainBot] WARNING: Low battery detected!")
-                    self.temi.speak("Warning: Headset battery is low. Please recharge.")
         except Exception as e:
             print(f"[BrainBot] Error processing sys stream: {e}")
 
@@ -105,10 +86,8 @@ class BrainBot:
         """Guide user through initial mental command baseline training."""
         print("\n=== BRAINBOT CALIBRATION ===")
         print("Please focus and think of a clear mental command (e.g., PUSH) for 10 seconds...")
-        self.temi.speak("Let's begin. Focus and think of pushing something forward.")
         time.sleep(self.interact_cfg["calibration_time"])
         print("Calibration complete. Ready for interaction!\n")
-        self.temi.speak("Calibration complete. Ready to test your brainpower!")
 
     def wait_for_assessment(self):
         """Wait for a complete mood assessment from the mood detector."""
@@ -116,46 +95,6 @@ class BrainBot:
         while not self.mood_detector.is_ready():
             time.sleep(0.1)
         print("[BrainBot] Mood detector ready for assessment.")
-
-    def determine_robot_action(self):
-        """
-        Decide what action Temi should take based on current mental state.
-        Returns: action_name, action_params
-        """
-        # If we have a clear mental command trigger
-        if self.last_mental_command in ["push", "lift"] and self.focus_level > 0.6:
-            # Strong focus + push/lift = celebration dance
-            return "celebration_dance", {}
-        
-        # Otherwise, use mood/focus level for graduated response
-        if self.focus_level >= self.focus_threshold_high:
-            # High focus: move forward
-            return "move_forward", {"distance": 0.8}
-        elif self.focus_level >= self.focus_threshold_med:
-            # Medium focus: turn in place
-            return "turn", {"angle": 30}  # Gentle right turn
-        else:
-            # Low focus: attract attention
-            return "attract_attention", {}
-
-    def execute_action(self, action_name, params=None):
-        """Execute the determined action on the Temi robot."""
-        params = params or {}
-        print(f"[BrainBot] Executing action: {action_name} with {params}")
-        
-        if action_name == "move_forward":
-            self.temi.move_forward(params.get("distance", 0.5))
-        elif action_name == "turn":
-            self.temi.turn(params.get("angle", 45))
-        elif action_name == "celebration_dance":
-            self.temi.perform_dance()
-        elif action_name == "attract_attention":
-            self.temi.speak("I sense you might need more focus. Let's try again!")
-            self.temi.turn(-20)  # Left
-            time.sleep(0.5)
-            self.temi.turn(40)   # Right
-        elif action_name == "speak_only":
-            self.temi.speak(params.get("text", "Hello from BrainBot!"))
 
     def run_demo_cycle(self):
         """Execute one complete demo interaction cycle."""
@@ -167,21 +106,15 @@ class BrainBot:
         # Step 2: Wait for real mood assessment
         self.wait_for_assessment()
         print(f"[BrainBot] Detected mood: {self.mood_assessment} (Focus: {self.focus_level:.2f})")
-        self.temi.speak(f"I detect you are feeling {self.mood_assessment.lower()} right now.")
         time.sleep(2.0)
         
         # Step 3: Mental command & focus assessment (simulated)
         print("[BrainBot] Assessing mental focus and command readiness...")
         time.sleep(2.0)
         
-        # Step 4: Determine and execute action
-        action_name, params = self.determine_robot_action()
-        self.execute_action(action_name, params)
-        
-        # Step 5: Feedback and reset
+        # Temi reflects the detected emotion through the Wizard-of-Oz app.
         time.sleep(3.0)
         print("[BrainBot] Demo cycle complete. Ready for next visitor.\n")
-        self.temi.speak("Thank you for trying BrainBot!")
         time.sleep(1.0)
 
     def start(self):
@@ -215,14 +148,16 @@ class BrainBot:
             sys.exit(1)
 
         # 5. Subscribe to streams
-        if not self.cortex_client.subscribe(['com', 'met', 'sys']):
+        if not self.cortex_client.subscribe(
+            ['com', 'met', 'sys'],
+            handlers={
+                'com': self._on_mental_command,
+                'met': self._on_performance_metrics,
+                'sys': self._on_system_event,
+            },
+        ):
             print("[BrainBot] FATAL: Could not subscribe to data streams.")
             sys.exit(1)
-
-        # 6. Check Temi reachability
-        if not self.temi.is_connected():
-            print("[BrainBot] WARNING: Could not reach Temi robot.")
-            print("         Robot actions will be simulated.")
 
         print("\nStarting demo loop. Press Ctrl+C to exit.\n")
         self.is_running = True

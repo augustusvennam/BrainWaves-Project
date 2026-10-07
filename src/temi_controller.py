@@ -1,7 +1,7 @@
 """
 Temi Robot Communication Layer.
 
-Real control path: this controller talks to a Temi robot over HTTP.
+Real control path: this controller talks to the temi-woz-android app over WebSocket.
 The Temi SDK is native Android — there is NO built-in HTTP/WebSocket API.
 You must run an Android app on the robot that exposes an HTTP server
 (this project's gateway). The real SDK methods are:
@@ -13,15 +13,15 @@ open-house crowds. All movement is gated by _check_safety().
 """
 
 import time
-import requests
+import json
+import websocket
 
 
 class TemiController:
-    """HTTP client for controlling a Temi mobile robot.
+    """WebSocket client for controlling a Temi mobile robot.
 
     Responsibilities:
-      - Send TTS speech commands.
-      - Move forward / turn / stop via the robot's HTTP gateway.
+      - Send TTS speech and navigation commands.
       - Enforce safety constraints (e-stop, signal-loss timeout).
     """
 
@@ -41,7 +41,8 @@ class TemiController:
         """
         self.robot_ip = robot_ip
         self.port = port
-        self.base_url = f"http://{robot_ip}:{port}/api"
+        self.url = f"ws://{robot_ip}:{port}"
+        self.timeout_s = 5
 
         # Safety settings
         self.max_speed_ms = max_speed_ms  # m/s — slow for open house crowds
@@ -69,88 +70,56 @@ class TemiController:
         self.last_signal_time = time.time()
 
     def is_connected(self):
-        """Lightweight reachability check against the robot gateway."""
+        """Open a WebSocket and verify the app's ready handshake."""
         try:
-            resp = requests.get(f"{self.base_url}/status", timeout=2)
-            return resp.status_code == 200
+            ws = websocket.create_connection(self.url, timeout=self.timeout_s)
+            try:
+                ws.recv()
+            finally:
+                ws.close()
+            return True
         except Exception as e:
             print(f"[Temi] Status check failed: {e}")
             return False
 
-    def speak(self, text):
-        """Make Temi speak a phrase via TTS.
-        Maps to real SDK: speak(text)
-        """
+    def _send_command(self, command):
+        """Send one protocol command and close the short-lived connection."""
+        ws = None
         try:
-            resp = requests.post(f"{self.base_url}/speak", json={"text": text}, timeout=3)
-            return resp.status_code == 200
+            ws = websocket.create_connection(self.url, timeout=self.timeout_s)
+            ws.recv()  # "Temi is ready to receive commands!"
+            ws.send(json.dumps(command))
+            return True
         except Exception as e:
-            print(f"[Temi] Speak failed: {e}")
+            print(f"[Temi] Command failed: {e}")
             return False
+        finally:
+            if ws is not None:
+                ws.close()
+
+    def speak(self, text):
+        """Make Temi speak a phrase via the temi-woz-android TTS command."""
+        return self._send_command({"command": "speak", "sentence": text})
 
     def move_forward(self, distance_meters=0.5):
-        """Move forward by specified distance.
-        Built from skidJoy primitives — NOT a native SDK method.
-        """
-        if not self._check_safety():
-            return False
-
-        try:
-            # Convert distance to time at max speed
-            duration_s = distance_meters / self.max_speed_ms
-            resp = requests.post(f"{self.base_url}/move", json={
-                "distance": distance_meters,
-                "max_speed": self.max_speed_ms
-            }, timeout=3)
-            if resp.status_code != 200:
-                print(f"[Temi] Move rejected: HTTP {resp.status_code}")
-                return False
-            self._is_moving = True
-            # Hold the e-stop line for the movement duration so a second
-            # command cannot stack on top of an in-flight move.
-            time.sleep(duration_s)
-            self._is_moving = False
-            return True
-        except Exception as e:
-            print(f"[Temi] Move failed: {e}")
-            self._is_moving = False
-            return False
+        """Movement is not exposed by the linked temi-woz-android protocol."""
+        print("[Temi] Move not supported by temi-woz-android; use a goto location.")
+        return False
 
     def turn(self, angle_degrees=90):
-        """Turn by specified degrees (positive = right, negative = left).
-        Built from turnBy primitives — NOT a native SDK method.
-        """
-        if not self._check_safety():
-            return False
-
-        direction = "right" if angle_degrees > 0 else "left"
-        try:
-            resp = requests.post(f"{self.base_url}/turn", json={
-                "angle": angle_degrees,
-                "max_speed": self.max_speed_ms
-            }, timeout=3)
-            if resp.status_code != 200:
-                print(f"[Temi] Turn rejected: HTTP {resp.status_code}")
-                return False
-            self._is_moving = True
-            # Hold for the turn duration so the robot actually finishes turning.
-            time.sleep(abs(angle_degrees) / 90.0 * 1.0)
-            self._is_moving = False
-            return True
-        except Exception as e:
-            print(f"[Temi] Turn failed: {e}")
-            self._is_moving = False
-            return False
+        """Turning is not exposed by the linked temi-woz-android protocol."""
+        print("[Temi] Turn not supported by temi-woz-android.")
+        return False
 
     def stop_movement(self):
-        """Emergency stop — maps to real SDK: stopMovement()"""
+        """No stop command is exposed by the linked app protocol."""
         self._is_moving = False
-        try:
-            resp = requests.post(f"{self.base_url}/stop", timeout=2)
-            return resp.status_code == 200
-        except Exception as e:
-            print(f"[Temi] Stop failed: {e}")
-            return False
+        print("[Temi] Stop is not exposed by temi-woz-android.")
+        return False
+
+    def goto(self, location):
+        """Navigate to an exact saved Temi location."""
+        return self._send_command({"command": "goto", "location": location})
 
     def perform_dance(self):
         """Execute a celebratory multi-step dance sequence.

@@ -1,4 +1,6 @@
 import { ArrowRight, Brain, Server, Bot } from 'lucide-react';
+import { SectionSubtitle } from './SectionSubtitle';
+import { SectionTitle } from './SectionTitle';
 
 type Node = {
   id: string;
@@ -42,28 +44,30 @@ export function ArchitectureDiagram() {
 
       <div className="relative flex flex-col items-center justify-center gap-2 md:flex-row md:items-center md:gap-2 md:w-full">
         {nodes.map((node, i) => (
-          <div key={node.id} className="flex flex-col items-center gap-1.5 text-center">
-            <div
-              className={[
-                'relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-2)] text-[var(--accent)]',
-                'border border-[var(--border-hairline)]',
-              ].join(' ')}
-            >
-              {node.icon}
+          <div key={node.id} className="contents">
+            <div className="flex flex-col items-center gap-1.5 text-center">
+              <div
+                className={[
+                  'relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-2)] text-[var(--accent)]',
+                  'border border-[var(--border-hairline)]',
+                ].join(' ')}
+              >
+                {node.icon}
+              </div>
+              <div className="text-xs text-[var(--text-tertiary)] line-clamp-1 max-w-[140px]">
+                {node.label}
+              </div>
+              <div className="text-[10px] text-[var(--text-subtle)] line-clamp-1 max-w-[140px]">
+                {node.sub}
+              </div>
             </div>
-            <div className="text-xs text-[var(--text-tertiary)] line-clamp-1 max-w-[140px]">
-              {node.label}
-            </div>
-            <div className="text-[10px] text-[var(--text-subtle)] line-clamp-1 max-w-[140px]">
-              {node.sub}
-            </div>
+            {i < nodes.length - 1 && (
+              <ArrowRight
+                className="h-5 w-5 text-[var(--accent)]"
+                style={{ transform: 'rotate(90deg)' }}
+              />
+            )}
           </div>
-          {i < nodes.length - 1 && (
-            <ArrowRight
-              className="h-5 w-5 text-[var(--accent)]"
-              style={{ transform: 'rotate(90deg)' }}
-            />
-          )}
         ))}
       </div>
     </section>

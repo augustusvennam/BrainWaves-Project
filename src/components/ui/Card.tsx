@@ -23,7 +23,8 @@ export default function Card({ children, className = '', elevated = false }: Car
 }
 
 interface CardHeaderProps {
-  title: string;
+  title?: string;
+  children?: React.ReactNode;
   subtitle?: string;
   icon?: React.ReactNode;
   badge?: string;
@@ -38,21 +39,22 @@ export function CardHeader({
   badge,
   badgeVariant,
   action,
+  children,
 }: CardHeaderProps) {
-  const isActionable = action !== undefined;
-
   return (
     <div className="flex items-start justify-between gap-3 px-5 py-4">
       <div className="flex items-center gap-2.5">
         {icon && <span className="text-[var(--accent)]">{icon}</span>}
-        <div>
-          <h2 className="text-[15px] font-medium leading-none text-[var(--text-ink)]">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="mt-1 text-[12px] text-[var(--text-subtle)]">{subtitle}</p>
-          )}
-        </div>
+        {children || (
+          <div>
+            <h2 className="text-[15px] font-medium leading-none text-[var(--text-ink)]">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="mt-1 text-[12px] text-[var(--text-subtle)]">{subtitle}</p>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-shrink-0 items-center gap-2">
         {badge && (

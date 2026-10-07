@@ -1,5 +1,3 @@
-import React from 'react';
-
 type LogEntryLevel = 'info' | 'warn' | 'error';
 
 interface LogEntryProps {

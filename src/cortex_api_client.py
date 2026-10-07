@@ -203,7 +203,13 @@ class CortexClient:
         """
         while not self._stop_listening.is_set():
             try:
-                data = json.loads(self.ws.recv())
+                raw_message = self.ws.recv()
+                if not raw_message:
+                    continue
+                data = json.loads(raw_message)
+            except json.JSONDecodeError:
+                print("[CortexClient] Ignoring non-JSON WebSocket frame.")
+                continue
             except Exception as e:
                 print(f"[CortexClient] Listener error: {e}")
                 break

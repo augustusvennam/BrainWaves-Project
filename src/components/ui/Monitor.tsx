@@ -1,5 +1,5 @@
 import React from 'react';
-import { Badge } from './Badge';
+import Badge from './Badge';
 
 type MonitorStatus = 'online' | 'offline' | 'idle' | 'connecting';
 
@@ -23,6 +23,7 @@ export default function Monitor({ id, title, status, detail, icon }: MonitorProp
 
   return (
     <div
+      data-monitor-id={id}
       className="group relative rounded-[var(--radius-lg)] border border-[var(--border-default)] bg-[var(--surface-1)] p-4 transition-colors duration-[var(--duration-normal)] ease-[var(--easing-out)] hover:border-[var(--border-hairline-strong)]"
       role="status"
       aria-label={`${title}: ${label}`}

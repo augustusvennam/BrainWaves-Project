@@ -1,3 +1,4 @@
+
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working in this repository.
@@ -9,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working in this
 Architecture: **EMOTIV EPOC X (EEG Headset) → Emotiv Cortex API (wss://localhost:6868) → Python Controller → Temi Robot SDK → Robot Actions**
 
 The project has two halves:
-- **Frontend** (React 18 + Vite + TypeScript): A monitoring dashboard at `src/` that visualizes Cortex data streams (`com`, `met`, `sys`). Built with Linear design system tokens (`src/styles/tokens.css`) and a component library in `src/components/ui/`. Runs locally via Vite dev server.
+- **Frontend** (React 18 + Vite + TypeScript): A monitoring dashboard at `src/` that visualizes Cortex data streams (`com`, `met`, `sys`). Built with Linear design system tokens (`src/styles/tokens.css`) and a component library in `src/components/ui/`. Deployed to Vercel (project ID: `prj_DcHiYDCplOdAQY10DcI3v3fVGSaC`, org: `team_UtnjFTxkFQM14O7yUnacmp4p`).
 - **Backend** (Python): `src/brainbot_main.py` is the main integration. It connects to Cortex via `cortex_api_client.py`, processes EEG via `mood_determiner.py`, and controls Temi via `temi_controller.py`. Config loaded from `config/settings.yaml`.
 
 ## Commands
@@ -17,7 +18,7 @@ The project has two halves:
 ### Frontend (Vite)
 ```bash
 npm run dev      # Start dev server on port 3000
-npm run build    # Build to dist/ for local hosting
+npm run build    # Build to dist/ (used by Vercel)
 npm run preview  # Preview built output on port 4173
 ```
 
@@ -28,6 +29,9 @@ python scripts/test_cortex.py      # Test Cortex API connectivity
 python scripts/test_temi.py        # Test Temi robot connectivity
 ```
 
+### Vercel Deployment
+The project is already linked to Vercel (`project.json` in `.vercel/`). Vercel config is at `vercel.json` (build: `npm run build`, output: `dist`). The Vercel CLI is not installed — use the Vercel web dashboard at `https://vercel.com` or install `@vercel/cli` to deploy from CLI.
+
 ## Key Architecture
 
 ### Data Flow
@@ -36,7 +40,7 @@ Cortex streams three data types to the Python backend:
 - `met` — performance metrics (eng, exc, str, rel, int, lex) → mood classification
 - `sys` — system events (connection quality, battery)
 
-The frontend dashboard is currently **static** (mock data in `App.tsx`) and is out of scope for the backend mock-removal work. The `App.tsx` component holds `monitors`, `milestones`, and `logs` state with clear prop-passing interfaces, and is structured to be WebSocket-ready for when live Cortex data is surfaced.
+The frontend dashboard is currently **static** (mock data in `App.tsx`) but is structured to be WebSocket-ready. The `App.tsx` component holds `monitors`, `milestones`, and `logs` state with clear prop-passing interfaces.
 
 ### Frontend Structure
 - `src/main.jsx` — React entry point
@@ -58,9 +62,11 @@ The frontend dashboard is currently **static** (mock data in `App.tsx`) and is o
 - `src/mood_determiner.py` — EEG signal processing and mood classification
 - `src/temi_controller.py` — Temi robot communication (HTTP/WebSocket)
 - `src/config.py` — Loads `config/settings.yaml`
+- `src/mock-api.js` — Mock API for frontend development
 
 ### Configuration
 - `config/settings.yaml` — Contains Emotiv credentials, EEG parameters, mood thresholds, Temi settings, interaction config
+- `vercel.json` — Vercel build config (buildCommand, outputDirectory, routes)
 - `vite.config.ts` — Vite config with React plugin, build output to `dist/`, sourcemaps, manual chunks for vendor/ui bundles
 
 ## Design System
@@ -72,7 +78,7 @@ The frontend dashboard is currently **static** (mock data in `App.tsx`) and is o
 - **Fonts**: Google Fonts Inter (cv01, ss03) + JetBrains Mono
 
 ## Notes
-- The frontend now connects to a local Python WebSocket server for real-time EEG data visualization.
+- The frontend is currently static with mock data. Real-time data readiness is built into the component interfaces — `monitors`, `milestones`, and `logs` are all prop-driven with clear TypeScript interfaces.
 - The `src/components/ui/DashboardSections.tsx` file is a composite renderer that is not currently imported by `App.tsx`. `App.tsx` composes sections directly. Either file can be used as the composition entry point.
 - The old `.jsx` files in `src/components/` are pre-redesign and should be removed once the new implementation is verified.
 - Python backend requires `websocket-client`, `pyyaml`, `numpy`, `scipy`, `requests` (see `requirements.txt`).

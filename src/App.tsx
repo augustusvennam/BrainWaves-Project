@@ -13,15 +13,9 @@
  * Run `python src/brainbot_main.py` to start the backend.
  */
 
-import React, { useState } from 'react';
-import { Server, Bot, Brain } from 'lucide-react';
+import { useState } from 'react';
 import {
-  Button,
   Badge,
-  Card,
-  CardHeader,
-  CardBody,
-  Monitor,
   LogEntry,
   MilestoneCard,
   SectionTitle,
@@ -29,11 +23,9 @@ import {
   ArchitectureDiagram,
   EEGDashboard,
 } from './components/ui';
-import { type ReactNode } from 'react';
 
 // Type definitions
 type MilestoneStatus = 'complete' | 'in-progress' | 'pending';
-type MonitorStatus = 'online' | 'offline' | 'idle' | 'connecting';
 
 // Default milestone data
 const defaultMilestones: Record<string, MilestoneStatus> = {
@@ -45,23 +37,8 @@ const defaultMilestones: Record<string, MilestoneStatus> = {
   hardware: 'pending',
 };
 
-// Default monitor data
-interface MonitorState {
-  id: string;
-  title: string;
-  status: MonitorStatus;
-  detail: string;
-  icon: ReactNode;
-}
-
-const defaultMonitors: Record<string, MonitorState> = {
-  cortex: { id: 'cortex', title: 'Cortex API Connection', status: 'connecting', detail: 'Connecting to wss://localhost:6868...', icon: Server },
-  temi: { id: 'temi', title: 'Temi Robot Connection', status: 'offline', detail: 'Waiting for Temi on network...', icon: Bot },
-  mood: { id: 'mood', title: 'Mood Detection Engine', status: 'idle', detail: 'Awaiting met stream data...', icon: Brain },
-};
-
 // Default activity log entries
-const defaultLogs = [
+const defaultLogs: { id: number; time: string; level: 'info' | 'warn' | 'error'; message: string }[] = [
   { id: 1, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'BrainWaves Project dashboard initialized' },
   { id: 2, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'Configure credentials in config/settings.yaml' },
   { id: 3, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'Start brainbot_main.py when hardware is ready' },
@@ -79,7 +56,6 @@ const defaultLogs = [
  */
 
 function App() {
-  const [monitors] = useState<MonitorState[]>(() => Object.values(defaultMonitors));
   const [milestones] = useState<Record<string, MilestoneStatus>>(() => ({ ...defaultMilestones }));
   const [logs] = useState<{ id: number; time: string; level: 'info' | 'warn' | 'error'; message: string }[]>(() => [...defaultLogs]);
 
@@ -98,9 +74,6 @@ function App() {
             </div>
             <div className="flex items-center gap-2 flex-wrap">
               <Badge label="Localhost" variant="info" dot={false} />
-              {monitors.map((m) => (
-                <Badge key={m.id} label={m.status} variant={statusVariant(m.status)} dot={false} />
-              ))}
             </div>
           </div>
         </header>
@@ -141,25 +114,6 @@ function App() {
                 />
               );
             })}
-          </div>
-        </section>
-
-        {/* ===== SYSTEM STATUS ===== */}
-        <section className="mb-6">
-          <SectionTitle>System Status</SectionTitle>
-          <SectionSubtitle>Real-time infrastructure health monitors</SectionSubtitle>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {monitors.map((m) => (
-              <Monitor
-                key={m.id}
-                id={m.id}
-                title={m.title}
-                status={m.status}
-                detail={m.detail}
-                icon={m.icon}
-              />
-            ))}
           </div>
         </section>
 
@@ -205,16 +159,6 @@ function App() {
       </div>
     </div>
   );
-}
-
-function statusVariant(status: MonitorStatus): 'online' | 'offline' | 'idle' | 'warning' {
-  switch (status) {
-    case 'online': return 'online';
-    case 'offline': return 'offline';
-    case 'idle': return 'idle';
-    case 'connecting': return 'warning';
-    default: return 'offline';
-  }
 }
 
 export default App;

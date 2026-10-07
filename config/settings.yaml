@@ -18,7 +18,7 @@ emotiv:
 # EEG / Brainwave settings
 eeg:
   sampling_rate: 128          # Hz (128 or 256 supported)
-  channels: 14                # EPOC X has 14 channels
+  channels: 14                # One demonstration wearer, EPOC X has 14 channels
   buffer_size: 512            # samples per processing window
   mental_command_sensitivity: 0.5  # 0.0-1.0
   filter_low: 1.0             # Hz (high-pass)
@@ -40,15 +40,12 @@ mood:
   theta_band: [4.0, 7.0]      # Hz - drowsiness / meditation
   gamma_band: [30.0, 100.0]   # Hz - peak concentration
 
-# Temi robot settings
-# NOTE: Temi SDK is native Android. You need an Android app running on the robot
-# that exposes an HTTP/WebSocket API. The real SDK methods are:
-#   goTo, skidJoy, turnBy, tiltBy, speak, stopMovement
-# Build custom sequences from these primitives.
+# Temi display integration
+# Temi is used only as an emotion display through the Wizard-of-Oz app.
 temi:
-  robot_ip: "192.168.1.100"   # Replace with your Temi's IP address
-  port: 80
-  base_url: "http://192.168.1.100:80"
+  robot_ip: "192.168.119.173"   # Replace with your Temi's IP address
+  port: 8175                 # temi-woz-android WebSocket port
+  base_url: "ws://192.168.119.173:8175"
   command_timeout: 5000        # ms
   safety:
     max_speed_ms: 0.3          # m/s — slow for open house crowds
@@ -56,16 +53,11 @@ temi:
     stop_on_signal_loss: true
     signal_loss_timeout: 3000  # ms
 
-# Interaction flow
+# Interaction flow (needs to be edited for our use case)
 interaction:
+  participant_count: 1
   calibration_time: 30.0       # seconds for baseline mental command training
   feedback_interval: 2.0       # seconds between feedback to user
   max_attempts: 5              # max mental command attempts before reset
   use_fac_fallback: true       # Use facial expressions if mental commands fail
   consent_required: true       # Visitor must consent before recording
-  dance_sequence:
-    - "turn_left"
-    - "turn_right"
-    - "move_forward"
-    - "say_hello"
-    - "dance"

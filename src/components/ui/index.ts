@@ -9,3 +9,4 @@ export { SectionTitle } from './SectionTitle';
 export { SectionSubtitle } from './SectionSubtitle';
 export { ArchitectureDiagram } from './ArchitectureDiagram';
 export { EEGGraph, EEG_METRICS } from './EEGGraph';
+export { EEGDashboard } from './EEGDashboard';

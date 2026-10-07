@@ -50,6 +50,7 @@ export default function MilestoneCard({
     <button
       type="button"
       onClick={onClick}
+      data-milestone-id={id}
       className={[
         'group relative flex items-start gap-3 rounded-[var(--radius-lg)]',
         'border border-[var(--border-default)] bg-[var(--surface-1)]',

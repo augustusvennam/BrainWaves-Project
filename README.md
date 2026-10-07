@@ -2,7 +2,7 @@
 
 **Brain–Robot Interaction Demo: "BrainBot: Can you control a robot with your brain?"**
 
-A mood-determining and brain-controlled robotics project using the Emotiv EPOC X EEG headset and the Temi robot.
+A mood-determining brain demonstration using one Emotiv EPOC X headset wearer. Temi is reserved for emotion display through the Wizard-of-Oz app.
 
 ---
 
@@ -37,10 +37,10 @@ Python Controller
             └── websocket.ts    # WebSocket client service
             │
             ▼
-    Temi Robot SDK (HTTP: http://192.168.1.100/api/)
+    temi-woz-android app (WebSocket: ws://<TEMI_IP>:8175)
             │
             ▼
-    Temi Robot Actions (Move Forward, Turn, Dance)
+    Temi Robot Actions (Speak, Ask, Go To)
 ```
 
 ---
@@ -205,7 +205,7 @@ This will:
 python scripts/test_temi.py
 ```
 
-To run in dry-run mode (skip actual HTTP calls):
+To run in dry-run mode (skip actual Temi calls):
 
 ```bash
 TEMI_DRY_RUN=1 python scripts/test_temi.py
