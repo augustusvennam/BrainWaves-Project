@@ -16,6 +16,14 @@ export function parseSnapshot(raw: string): Snapshot {
     !object(value.streams) || !object(value.rejected_streams) || !object(value.latest) ||
     !Array.isArray(value.eeg) || value.eeg.length > 256 || !Array.isArray(value.events) || value.events.length > 40 ||
     !number(value.invalid_samples)) throw new Error('Malformed backend snapshot.');
+  if (!object(value.connections)) throw new Error('Missing connection status.');
+  for (const name of ['cortex', 'headset', 'temi']) {
+    const connection = value.connections[name];
+    if (!object(connection) || !['unknown', 'connecting', 'connected', 'disconnected', 'unconfigured', 'unavailable'].includes(String(connection.status)) ||
+      typeof connection.message !== 'string' || !(connection.checked_at === null || number(connection.checked_at))) {
+      throw new Error('Malformed connection status.');
+    }
+  }
   for (const sample of value.eeg) {
     if (!object(sample) || !number(sample.time) || !object(sample.values) || typeof sample.interpolated !== 'boolean' ||
       !Object.values(sample.values).every(number)) throw new Error('Malformed EEG sample.');

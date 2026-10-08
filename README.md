@@ -4,6 +4,12 @@ A local dashboard for the Emotiv EPOC X EEG headset. The Python backend connects
 
 The wider BrainBot project explores brain–robot interaction with Temi. This version provides live headset monitoring plus an optional speech/stop interface for an independently installed Temi Android bridge. Mental commands are displayed, but do not automatically move the robot.
 
+## Branch integration
+
+The dashboard remains from `hamzacode`. Hardware clients from `main` (`26022de`) are retained in `backend/legacy` and used through the FastAPI adapters. Cortex retains the dashboard adapter's single socket reader, request matching, stream parsing, and retry logic. Small changes to the original clients allow connection timeouts, certificate configuration, and authenticated bridge URLs. The simulated BrainBot demo is not launched.
+
+The dashboard shows independent backend, Cortex API, headset, and Temi robot connection cards. The Temi bridge must expose `GET /api/status` with a boolean `robot_connected` based on its actual SDK connection; checks run every five seconds. See [bridge contract](docs/temi-bridge.md).
+
 ## Features
 
 - Live individual or all-channel EEG waveforms in microvolts, with a rolling ten-second history.

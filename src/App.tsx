@@ -1,3 +1,4 @@
+import { Connectivity } from './components/dashboard/Connectivity';
 import { useDashboard } from './hooks/useDashboard';
 import { EegChannels } from './components/dashboard/EegChannels';
 import { Metrics } from './components/dashboard/Metrics';
@@ -11,6 +12,7 @@ export default function App() {
   return <main className="dashboard">
     <header className="row wrap"><div><p className="eyebrow">BrainWaves / BrainBot</p><h1>EEG dashboard</h1><p className="hint">Local headset monitoring · genuine Cortex data</p></div>
       <span className={`badge ${connection === 'connected' ? 'online' : 'offline'}`}>Backend {connection}</span></header>
+    <Connectivity snapshot={snapshot} connection={connection} />
     <section className="status" aria-live="polite"><strong>{snapshot?.status.phase.replaceAll('_', ' ') ?? 'Waiting for backend'}</strong><p>{snapshot?.status.message ?? 'Start the local backend. The dashboard reconnects automatically.'}</p>{snapshot?.headset && <p className="hint">Headset: {snapshot.headset.id}</p>}</section>
     {error && <p className="error" role="alert">{error}</p>}
     <EegChannels snapshot={snapshot} history={history} />

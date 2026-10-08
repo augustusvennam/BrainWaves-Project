@@ -8,7 +8,13 @@ export interface EegSample {
   values: Record<string, number>;
   interpolated: boolean;
 }
+export interface ConnectionStatus {
+  status: 'unknown' | 'connecting' | 'connected' | 'disconnected' | 'unconfigured' | 'unavailable';
+  message: string;
+  checked_at: number | null;
+}
 export interface Snapshot {
+  connections: Record<'cortex' | 'headset' | 'temi', ConnectionStatus>;
   revision: number;
   server_time: number;
   status: { phase: string; message: string };

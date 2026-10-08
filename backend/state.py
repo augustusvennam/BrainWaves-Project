@@ -12,6 +12,8 @@ class DashboardState:
         self.lock = threading.RLock()
         self.revision = 0
         self.status = {'phase': 'starting', 'message': 'Starting local backend.'}
+        self.connections = {name: {'status': 'unknown', 'message': 'Waiting for connection check.', 'checked_at': None}
+                            for name in ('cortex', 'headset', 'temi')}
         self.headset = None
         self.session_id = None
         self.schemas = {}
@@ -21,6 +23,11 @@ class DashboardState:
         self.arrivals = {}
         self.events = deque(maxlen=40)
         self.invalid_samples = 0
+
+    def set_connection(self, name, status, message):
+        with self.lock:
+            self.connections[name] = {'status': status, 'message': message, 'checked_at': time.time()}
+            self.revision += 1
 
     def set_status(self, phase, message):
         with self.lock:
@@ -83,6 +90,7 @@ class DashboardState:
                 }
             return deepcopy({
                 'revision': self.revision, 'server_time': time.time(),
+                'connections': self.connections,
                 'status': self.status, 'headset': self.headset, 'session_id': self.session_id,
                 'streams': stream_status, 'rejected_streams': self.rejected,
                 'latest': self.latest, 'eeg': list(self.eeg),

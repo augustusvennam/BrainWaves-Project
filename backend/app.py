@@ -15,14 +15,17 @@ from backend.state import DashboardState
 settings = Settings.from_env()
 state = DashboardState()
 cortex = CortexService(settings, state)
-temi = TemiBridge(settings.temi_url, settings.temi_token)
+temi = TemiBridge(settings.temi_url, settings.temi_token, state)
 
 
 @asynccontextmanager
 async def lifespan(app):
     cortex.start()
-    yield
-    await asyncio.to_thread(cortex.stop)
+    temi.start()
+    try:
+        yield
+    finally:
+        await asyncio.gather(asyncio.to_thread(cortex.stop), asyncio.to_thread(temi.stop))
 
 
 app = FastAPI(title='BrainWaves local backend', lifespan=lifespan)
@@ -31,7 +34,7 @@ app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_origin], all
 
 @app.get('/api/health')
 def health():
-    return {'ok': True, 'cortex': state.snapshot()['status'], 'temi_configured': bool(settings.temi_url)}
+    return {'ok': True, 'cortex': state.snapshot()['status'], 'temi_configured': bool(settings.temi_url), 'connections': state.snapshot()['connections']}
 
 
 @app.get('/api/snapshot')

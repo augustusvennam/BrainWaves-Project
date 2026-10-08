@@ -1,6 +1,6 @@
 # Optional Temi integration
 
-The current dashboard monitors the headset and displays mental commands. It does not trigger robot movement automatically. Existing randomly selected mood-driven motion and mock robot output were removed.
+The current dashboard monitors the headset and displays mental commands. It does not trigger robot movement automatically. The main-branch TemiController is reused in real mode for speech and stop. The simulated demo loop is not started.
 
 Temi's native SDK runs in an Android app on the robot. The Python bridge client requires a separately installed app/server exposing the contract below. These are application-defined endpoints, not built-in Temi URLs.
 
@@ -8,10 +8,11 @@ Set `TEMI_BRIDGE_URL` to a base URL such as `http://192.168.1.100:8080/api`. Set
 
 | Local backend route | Bridge request | SDK responsibility |
 |---|---|---|
+| Connection monitor (every 5 seconds) | `GET <base>/status` | Return JSON `{ "robot_connected": true }` based on actual SDK connection; return false when disconnected |
 | `POST /api/temi/speak`, JSON `{ "text": "Hello" }` | `POST <base>/speak`, same JSON | Perform text-to-speech using the SDK |
 | `POST /api/temi/stop` | `POST <base>/stop`, JSON `{}` | Invoke SDK stop movement |
 
-The client accepts successful HTTP status codes and reports command acceptance, not physical completion. An unconfigured bridge returns 503. Network errors or rejected commands return 502. Speech input is restricted to 1–300 characters. These endpoints are accessible through the local backend's interactive `/docs` page; the EEG dashboard has no misleading robot-connection badge.
+The main-branch command client accepts HTTP 200 and reports command acceptance, not physical completion. An unconfigured bridge returns 503. Network errors or rejected commands return 502. Speech input is restricted to 1–300 characters. These endpoints are accessible through the local backend's interactive `/docs` page. The dashboard displays Temi status separately. A reachable bridge without a boolean `robot_connected` reports unknown; unavailable status endpoints report unavailable. Merely configuring the URL does not report the robot connected.
 
 Movement integration still needs a defined contract for bounded commands, acknowledgments, completion, cancellation, and robot-side heartbeat expiry. An actual emergency-stop state is separate from movement-in-progress. Verify SDK speed coefficients against physical speed on the actual robot, preserve obstacle protection, and test in a clear supervised area before enabling EEG-driven motion. A stop HTTP call alone does not provide a complete emergency-stop mechanism.
 

@@ -35,3 +35,8 @@ meter::-webkit-meter-optimum-value { background: var(--accent); }
 .events li { display: grid; grid-template-columns: 90px 1fr; gap: 16px; }
 time, footer { color: var(--text-subtle); font-size: 12px; }
 @media (max-width: 700px) { .columns { grid-template-columns: 1fr; } .dashboard { padding: 20px 12px; } .panel { padding: 16px; } }
+
+.connectivity { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.connectivity h2 { font-size: 14px; margin: 0; }
+@media (max-width: 1000px) { .connectivity { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 500px) { .connectivity { grid-template-columns: 1fr; } }

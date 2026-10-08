@@ -3,6 +3,7 @@ import { appendHistory, MAX_SAMPLES, parseSnapshot } from './snapshot';
 import type { EegSample } from '../types/dashboard';
 const sample = (time: number): EegSample => ({ time, values: { AF3: 4200 }, interpolated: false });
 const snapshot = {
+  connections: Object.fromEntries(['cortex', 'headset', 'temi'].map(name => [name, { status: 'connected', message: 'Connected', checked_at: 100 }])),
   revision: 1, server_time: 100, status: { phase: 'streaming', message: 'Connected' },
   headset: { id: 'test', status: 'connected' }, session_id: 'test-session',
   streams: { eeg: { age_seconds: 0, observed_hz: 128 } }, rejected_streams: {},
@@ -11,6 +12,10 @@ const snapshot = {
 describe('backend payload validation', () => {
   it('accepts channel amplitudes without altering them', () => {
     expect(parseSnapshot(JSON.stringify(snapshot)).eeg[0].values.AF3).toBe(4200);
+  });
+  it('rejects missing or malformed connectivity reports', () => {
+    expect(() => parseSnapshot(JSON.stringify({ ...snapshot, connections: undefined }))).toThrow();
+    expect(() => parseSnapshot(JSON.stringify({ ...snapshot, connections: { ...snapshot.connections, temi: { status: 'connected' } } }))).toThrow();
   });
   it('rejects malformed data', () => {
     expect(() => parseSnapshot('{}')).toThrow();

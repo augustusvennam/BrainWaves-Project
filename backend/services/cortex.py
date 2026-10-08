@@ -8,6 +8,8 @@ import time
 
 import websocket
 
+from backend.legacy.cortex_api_client import CortexClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,9 +77,14 @@ class CortexService:
             self.state.receive(self.pending.popleft())
 
     def connect_session(self):
+        self.state.set_connection('cortex', 'connecting', 'Connecting to local Cortex API.')
         self.state.set_status('connecting', 'Connecting to local Emotiv Cortex.')
         tls = {'cert_reqs': ssl.CERT_REQUIRED, 'ca_certs': self.settings.ca_cert} if self.settings.ca_cert else {'cert_reqs': ssl.CERT_NONE}
-        self.ws = websocket.create_connection(self.settings.cortex_url, timeout=self.settings.request_timeout, sslopt=tls)
+        client = CortexClient(self.settings.client_id, self.settings.client_secret, self.settings.cortex_url)
+        if not client.connect(timeout=self.settings.request_timeout, sslopt=tls):
+            raise CortexError('Cannot connect to local Cortex. Open Emotiv Launcher; retrying automatically.')
+        self.ws = client.ws
+        self.state.set_connection('cortex', 'connected', 'Local Cortex API connected.')
         self.ws.settimeout(1)
         access = self.request('requestAccess', {
             'clientId': self.settings.client_id, 'clientSecret': self.settings.client_secret,
@@ -88,8 +95,10 @@ class CortexService:
         candidates = [h for h in headsets if h.get('status') == 'connected' and (
             not self.settings.headset_id or h.get('id') == self.settings.headset_id)]
         if not candidates:
+            self.state.set_connection('headset', 'disconnected', 'No connected headset found in Cortex.')
             self.state.set_status('waiting_headset', 'No connected headset. Pair it in Emotiv Launcher; retrying automatically.')
             return False
+        self.state.set_connection('headset', 'connected', f"Headset {candidates[0]['id']} connected.")
         auth_params = {'clientId': self.settings.client_id, 'clientSecret': self.settings.client_secret}
         if self.settings.activate_session:
             # Activated sessions may consume the user's licensed session quota.
@@ -142,9 +151,12 @@ class CortexService:
         self.ws = None
         self.token = None
         self.pending.clear()
+        self.state.set_connection('cortex', 'disconnected', 'Cortex socket closed; waiting for retry.')
+        self.state.set_connection('headset', 'unknown', 'Headset connection cannot be verified while Cortex is disconnected.')
 
     def run(self):
         if not self.settings.client_id or not self.settings.client_secret:
+            self.state.set_connection('cortex', 'unconfigured', 'Set Emotiv credentials in .env to connect.')
             self.state.set_status('waiting_credentials', 'Set EMOTIV_CLIENT_ID and EMOTIV_CLIENT_SECRET in .env, then restart the backend.')
             return
         while not self.stop_event.is_set():
