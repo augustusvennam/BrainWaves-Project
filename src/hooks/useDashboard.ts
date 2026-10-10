@@ -26,13 +26,18 @@ export function useDashboard() {
           const next = parseSnapshot(event.data);
           lastMessage = Date.now();
           attempts = 0;
-          if (next.session_id !== session) {
-            session = next.session_id;
-            setHistory(appendHistory([], next.eeg));
+          if (`${next.session_id}:${next.epoch ?? 0}` !== session) {
+            session = `${next.session_id}:${next.epoch ?? 0}`;
+            setHistory(appendHistory([], next.eeg, 30));
           } else {
-            setHistory(current => appendHistory(current, next.eeg));
+            setHistory(current => appendHistory(current, next.eeg, 30));
           }
-          setSnapshot(next);
+          setSnapshot(previous => {
+            const same = previous?.epoch === next.epoch && previous?.session_id === next.session_id;
+            const combined = [...(same ? previous?.metric_history ?? [] : []), ...(next.metric_history ?? [])];
+            const newest = combined.at(-1)?.time ?? 0;
+            return {...next, metric_history: combined.filter(s => s.time >= newest-300).slice(-2048)};
+          });
           setConnection('connected');
           setError('');
         } catch {

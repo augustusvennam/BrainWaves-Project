@@ -40,3 +40,25 @@ time, footer { color: var(--text-subtle); font-size: 12px; }
 .connectivity h2 { font-size: 14px; margin: 0; }
 @media (max-width: 1000px) { .connectivity { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 500px) { .connectivity { grid-template-columns: 1fr; } }
+
+button, input, textarea {font: inherit; color: var(--text-ink); background: var(--surface-2); border: 1px solid var(--border-hairline-strong); border-radius: 6px; padding: 10px 12px; max-width: 100%;}
+button {cursor: pointer; min-height: 44px;}
+button:hover:not(:disabled) {border-color: var(--accent); background: var(--surface-3);}
+button:disabled {opacity: .5; cursor: not-allowed;}
+:focus-visible {outline: 2px solid #929dff; outline-offset: 3px;}
+::selection {background: #929dff; color: #11131a;}
+.controls {display: flex; flex-wrap: wrap; align-items: end; gap: 10px; margin: 16px 0;}
+.operator {display: grid; gap: 22px;}
+.operator label {display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; white-space: normal; margin: 8px 0;}
+textarea {width: 100%; min-height: 80px;}
+.electrodes {display: flex; flex-wrap: wrap; gap: 20px; align-items: start; margin: 16px 0;}
+.electrodes svg {width: 230px; max-width: 100%; color: #a6a9b3;}
+svg text {fill: #cdd0da; font-size: 11px;}
+figcaption {font-size: 12px; color: #a6a9b3;}
+table {border-collapse: collapse; font-size: 12px; width: 100%;}
+th, td {padding: 7px; text-align: left; border-bottom: 1px solid var(--border-hairline); font-variant-numeric: tabular-nums;}
+.trend {margin: 8px 0;}
+.trend svg {display: block; width: 100%;}
+.replay {padding: 16px; border: 2px solid #eac765; color: #eac765; font-weight: 600;}
+dd {margin: 4px 0;}
+@media (prefers-reduced-motion: reduce) {*, *::before, *::after {animation: none !important; transition: none !important; scroll-behavior: auto !important;}}

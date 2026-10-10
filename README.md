@@ -2,27 +2,37 @@
 
 A local dashboard for the Emotiv EPOC X EEG headset. The Python backend connects to the Emotiv Cortex service on your computer; the React dashboard shows genuine samples and clearly reports when hardware, credentials, or licensed streams are unavailable.
 
-The wider BrainBot project explores brain–robot interaction with Temi. This version provides live headset monitoring plus an optional speech/stop interface for an independently installed Temi Android bridge. Mental commands are displayed, but do not automatically move the robot.
+The wider BrainBot project explores brain–robot interaction with Temi. This version provides participant baseline/assessment workflows, labelled heuristic estimates, profile training, optional consent-gated recording/replay/filtering, and a Temi Android bridge source project. Mental commands are displayed, but do not automatically move the robot.
 
 ## Branch integration
 
-The dashboard remains from `hamzacode`. Hardware clients from `main` (`26022de`) are retained in `backend/legacy` and used through the FastAPI adapters. Cortex retains the dashboard adapter's single socket reader, request matching, stream parsing, and retry logic. Small changes to the original clients allow connection timeouts, certificate configuration, and authenticated bridge URLs. The simulated BrainBot demo is not launched.
+The dashboard remains from `hamzacode`. Hardware clients from `main` (`26022de`) are retained in `backend/legacy` and preserved. Cortex uses the connection client through its single-owner adapter; Temi uses the documented v1 bridge contract directly. Cortex retains the dashboard adapter's single socket reader, request matching, stream parsing, and retry logic. Small changes to the original clients allow connection timeouts, certificate configuration, and authenticated bridge URLs. The simulated BrainBot demo is not launched.
 
 The dashboard shows independent backend, Cortex API, headset, and Temi robot connection cards. The Temi bridge must expose `GET /api/status` with a boolean `robot_connected` based on its actual SDK connection; checks run every five seconds. See [bridge contract](docs/temi-bridge.md).
 
+## Operator documentation
+
+- [Session operation, profile/training and configuration](docs/operator-guide.md)
+- [Estimated-state formulas, thresholds and evaluation](docs/estimated-state.md)
+- [Recording, replay, causal filtering and future LSL boundary](docs/recording.md)
+- [Android Temi bridge contract and installation](docs/temi-bridge.md)
+- [Checks and hardware acceptance](docs/verification.md)
+
+Optional filter installation: `python -m pip install -r requirements-filter.txt`. All Python requirements use the checked-in exact transitive `constraints.txt`; update pins deliberately and rerun the checks. GitHub Actions runs typecheck, ESLint/Ruff, frontend/backend tests including optional filtering, and production build on Python 3.11/3.14 with Node 24. The hosted workflow itself has not run until this branch is pushed by an authorized user.
+
 ## Features
 
-- Live individual or all-channel EEG waveforms in microvolts, with a rolling ten-second history.
+- Live individual or all-channel EEG waveforms in microvolts, with configurable 2–30-second windows, pause and scale controls.
 - Cortex-provided frequency-band power by channel, when subscribed and licensed.
 - Performance metrics with inactive/null values preserved as unavailable.
 - Device/contact quality, EEG quality, headset status, and mental-command power.
 - Stream subscription failures, sample freshness, observed arrival rates, and malformed-sample counts.
 - Automatic Cortex retry and browser reconnect; session changes clear previous participant data.
-- Local-only defaults, bounded buffers, and no generated EEG data or EEG recordings on disk.
+- Local-only defaults, bounded buffers, and no generated EEG data. Recording is explicitly consent-gated and off by default.
 
 ## Technology and architecture
 
-Frontend: React 18, TypeScript, Vite, native WebSocket, and Canvas charts. Backend: Python, FastAPI/Uvicorn, and websocket-client. ESLint, Ruff, Vitest, and Python unittest provide checks. No chart framework or signal-processing dependency is required because the application displays raw EEG and Cortex-provided band power.
+Frontend: React 18, TypeScript, Vite, native WebSocket, and Canvas charts. Backend: Python, FastAPI/Uvicorn, and websocket-client. ESLint, Ruff, Vitest, and Python unittest provide checks. No chart framework is required. SciPy is optional for the causal filtered EEG view.
 
 ```mermaid
 flowchart LR
@@ -32,7 +42,7 @@ flowchart LR
     P --> S[Bounded live state]
     S -->|Local WebSocket, 10 updates/sec| F[React dashboard]
     F --> W[Canvas waveforms and metric panels]
-    B -. optional HTTP speech/stop .-> T[Custom Temi Android bridge]
+    B -. operator-confirmed speech/stop/expression .-> T[Temi Android SDK bridge]
 ```
 
 Cortex is the headset service, not this application's backend. Cortex normally listens at `wss://localhost:6868`. Our backend normally listens at `http://localhost:8000`. The frontend normally runs at `http://localhost:3000`.
@@ -153,7 +163,7 @@ The backend must also be running for live data. Preview uses the same frontend p
 4. Start the application and approve access in Launcher when requested. The backend retries while waiting for access or the headset.
 5. For waveforms, set `CORTEX_ACTIVATE_SESSION=true` and add `eeg` to `CORTEX_STREAMS` if your license permits it. For Cortex band-power data, add `pow` if permitted. Example: `com,met,dev,eq,sys,eeg,pow`.
 6. Restart the backend after changing stream configuration. Denied streams appear individually; successful streams can still display data.
-7. To use mental commands, train neutral and an action in EmotivBCI and load the participant's profile. This application does not implement training controls or profile management.
+7. To use mental commands, load an EPOC-compatible participant profile and train neutral then one action using the dashboard or EmotivBCI. Use dashboard profile/training controls; see the operator guide.
 
 ## How data reaches the dashboard
 
@@ -161,13 +171,13 @@ The backend opens one Cortex socket and performs `requestAccess`, `queryHeadsets
 
 Samples include a session ID and a Unix timestamp in seconds. The parser validates the timestamp and structure, expands nested device-quality labels, extracts EEG sensor amplitudes, and respects metric `.isActive` flags. Samples from old sessions and invalid EEG are not plotted. Metadata such as markers and counters is not mistaken for a sensor channel.
 
-Live state stores the latest sample per stream and up to 256 EEG samples. Every 100 ms, `/api/live` sends each browser a snapshot. The browser validates the message, deduplicates overlapping EEG batches, and retains at most ten seconds / 4,096 samples. Slow connections may miss samples; this is a monitor, not a lossless recording system.
+Live state stores the latest sample per stream, up to 256 raw/filtered EEG samples and 2,048 metric samples. Every 100 ms, `/api/live` sends metadata and incremental EEG/metric batches using sequence cursors; the first message is a bounded snapshot. Slow consumers receive explicit EEG gap counts instead of an unbounded queue. The browser retains at most 30 seconds / 16,384 EEG samples and 300 seconds / 2,048 metric samples. Duplicate and out-of-order timestamps are rejected and counted. Participant epochs clear browser history independently of Cortex sessions. Optional recording writes valid samples on the backend acquisition path before visualization eviction.
 
 ## Understanding the dashboard
 
-- **Waveforms:** genuine unfiltered sensor amplitude in µV. The vertical axis adjusts automatically per trace. Gaps over 100 ms break the line. Cortex interpolation flags are counted, and last-sample age identifies frozen/stale data. Choose one channel or show all received channels.
+- **Waveforms:** genuine raw sensor amplitude in µV, or an explicitly labelled optional causal filtered view. Choose automatic/fixed/common scale. Gaps over 100 ms break the line. Cortex interpolation flags are counted, and last-sample age identifies frozen/stale data. Choose one channel or show all received channels.
 - **Band power:** Cortex's `pow` values in µV²/Hz for theta, alpha, low/high beta, and gamma. The application does not calculate Delta or derive bands from raw EEG.
-- **Performance metrics:** vendor estimates such as engagement and relaxation. Values are displayed without classifying mood; inactive/null entries remain unavailable.
+- **Performance metrics:** vendor estimates such as engagement and relaxation. Inactive/null entries remain unavailable. Timestamped vendor trends are separate from the explicitly labelled application Estimated state.
 - **Quality:** `dev` contact quality and `eq` EEG quality are shown separately, using received labels. Channel quality is 0–4; overall quality is 0–100. Battery fields retain their original scale.
 - **Availability:** requested-but-denied streams differ from streams not requested, and subscribed streams waiting for their first sample. Observed rates are based on backend arrivals over a short window; low-frequency streams may show no rate estimate.
 - **Connection:** the frontend detects closed and silent connections and reconnects. The backend checks headset presence about every five seconds and retries after failures. A new session clears old traces and metric values.
@@ -208,8 +218,8 @@ Keep hardware I/O in `backend/services`, data interpretation in `backend/data.py
 
 No physical headset or robot was used to validate this refactor. Account/license eligibility, electrode preparation, real sampling rate, participant training, and firmware compatibility still require hardware testing. Default stream access is not guaranteed; the subscription response is authoritative. The current channel extraction covers EPOC X and common Emotiv sensor names, not arbitrary custom Flex sensor mappings.
 
-The UI does not record data, train profiles, perform artifact rejection, or validate emotional states. It does not implement consent-driven recording because it does not record. In-memory sample buffers are cleared between Cortex sessions; the application is a single-headset local monitor.
+Participant operation, profile/training, estimated-state formulas and limitations, recording/replay/filtering and hardware acceptance are documented below. The single-headset workflow is local and operator-controlled. Estimates are unvalidated heuristic scores, not probabilities, validated confidence or medical diagnoses. Automatic robot movement remains disabled.
 
-Temi speech and stop support require an external bridge. Automatic movement, dance, speed calibration, robot-side watchdog, and a genuine emergency-stop mechanism remain separate hardware work. See [Temi bridge contract](docs/temi-bridge.md). Local endpoints should remain bound to loopback; exposing them to a network requires an authentication design.
+Temi speech, cancellation and on-screen expression require building/installing the supplied Android bridge. Android build/tooling and physical firmware/SDK behavior remain hardware-dependent checks. An SDK stop request is not a verified emergency-stop mechanism.
 
 Official protocol references and stream formats are documented in [Cortex integration](docs/research.md).

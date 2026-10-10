@@ -2,6 +2,8 @@
 from collections import deque
 import json
 import logging
+from queue import Queue, Empty, Full
+from concurrent.futures import Future, TimeoutError
 import ssl
 import threading
 import time
@@ -26,6 +28,7 @@ class CortexService:
         self.counter = 0
         self.pending = deque(maxlen=1024)
         self.token = None
+        self.requests = Queue(maxsize=32)
         self.thread = threading.Thread(target=self.run, name='cortex', daemon=True)
 
     def start(self):
@@ -38,6 +41,102 @@ class CortexService:
             self.ws.close()
             self.thread.join(timeout=2)
 
+    def submit(self, operation, payload):
+        if not self.token or not self.state.headset:
+            raise CortexError('Cortex/headset unavailable.')
+        future = Future()
+        try:
+            self.requests.put_nowait((operation, {**payload, '_epoch': self.state.epoch}, future))
+        except Full as error:
+            raise CortexError('Cortex request queue full.') from error
+        try:
+            return future.result(timeout=self.settings.request_timeout * 5)
+        except TimeoutError as error:
+            future.cancel()
+            raise CortexError('Queued request timed out; refresh profile status before retrying.') from error
+
+    def process_requests(self):
+        try:
+            operation, payload, future = self.requests.get_nowait()
+        except Empty:
+            return
+        if not future.set_running_or_notify_cancel():
+            return
+        try:
+            if payload.get('_epoch', self.state.epoch) != self.state.epoch or self.state.acquisition.replay:
+                raise CortexError('Request cancelled because participant/Replay changed.')
+            future.set_result(self.operator_request(operation, payload))
+        except Exception as error:
+            future.set_exception(error)
+        finally:
+            self.drain_pending()
+
+    def operator_request(self, operation, payload):
+        params = {'cortexToken': self.token, 'headset': self.state.headset['id']}
+        current = self.request('getCurrentProfile', params)
+        self.state.profiles['current'] = current
+        if operation == 'refresh':
+            items = self.request('queryProfile', {'cortexToken': self.token})
+            self.state.profiles['items'] = items
+            return self.state.profiles
+        if operation == 'participant_reset':
+            if current.get('loadedByThisApp') is True:
+                if self.state.profiles.get('training_action'):
+                    self.request('training', {'cortexToken': self.token, 'session': self.state.session_id,
+                                 'detection': 'mentalCommand', 'action': self.state.profiles['training_action'], 'status': 'reset'})
+                self.request('setupProfile', {**params, 'status': 'unload', 'profile': ''})
+            self.state.profiles.update(current={}, training='idle', training_action=None, training_event=None, neutral_accepted=False)
+            return {'ok': True}
+        if current.get('name') and current.get('loadedByThisApp') is not True:
+            raise CortexError('Profile belongs to another application. Unload it there first.')
+        if operation in ('create', 'load', 'unload', 'save'):
+            if operation == 'load' and current.get('name'):
+                raise CortexError('Explicitly unload the current profile first.')
+            profile_params = {'cortexToken': self.token} if operation == 'create' else params
+            result = self.request('setupProfile', {**profile_params, 'status': operation,
+                                  'profile': '' if operation == 'unload' else payload['profile']})
+            self.state.profiles['current'] = self.request('getCurrentProfile', params)
+            if operation in ('load', 'unload'):
+                self.state.profiles.update(training='idle', training_action=None, training_event=None, neutral_accepted=False)
+            return result
+        if operation == 'training':
+            if 'sys' not in self.state.schemas:
+                raise CortexError('Subscribe to sys before training.')
+            if not current.get('name'):
+                raise CortexError('Load a participant profile before training.')
+            info = self.request('getDetectionInfo', {'detection': 'mentalCommand'})
+            action, status = payload['action'], payload['status']
+            training = self.state.profiles
+            if status in ('accept', 'reject', 'reset'):
+                action = training.get('training_action')
+                if not action:
+                    raise CortexError('No pending training action.')
+            if status in ('accept', 'reject') and training.get('training_event') != 'MC_Succeeded':
+                raise CortexError('Wait for MC_Succeeded before accepting or rejecting.')
+            if status == 'start' and training.get('training_action'):
+                raise CortexError('Accept, reject or cancel the current training first.')
+            if status == 'start' and action != 'neutral' and not training.get('neutral_accepted'):
+                raise CortexError('Train and accept neutral first.')
+            if action not in info.get('actions', []) or status not in info.get('controls', []):
+                raise CortexError('Unsupported training action/control.')
+            previous_action = training.get('training_action')
+            if status == 'start':
+                training['training_action'] = action
+                training['training_event'] = None
+            try:
+                result = self.request('training', {'cortexToken': self.token, 'session': self.state.session_id,
+                                  'detection': 'mentalCommand', 'action': action, 'status': status})
+            except Exception:
+                training['training_action'] = previous_action
+                raise
+            if status in ('accept', 'reject', 'reset'):
+                if status == 'accept' and action == 'neutral':
+                    training['neutral_accepted'] = True
+                training['training_action'] = None
+            self.state.profiles['training'] = training.get('training_event') or ('Request accepted; waiting for sys event: ' + status)
+            return result
+        raise CortexError('Unsupported profile operation.')
+
     def request(self, method, params=None, *, allow_shutdown=False):
         self.counter += 1
         request_id = self.counter
@@ -49,6 +148,13 @@ class CortexService:
             except websocket.WebSocketTimeoutException:
                 continue
             if message.get('id') != request_id:
+                if message.get('sid') == self.state.session_id and self.state.schemas:
+                    self.state.receive(message)
+                    continue
+                if len(self.pending) == self.pending.maxlen:
+                    self.state.counters['dropped_samples'] += 1
+                    if self.state.acquisition.file:
+                        self.state.acquisition.loss += 1
                 self.pending.append(message)
                 continue
             if 'error' in message:
@@ -70,6 +176,7 @@ class CortexService:
         except (ValueError, TypeError):
             with self.state.lock:
                 self.state.invalid_samples += 1
+                self.state.acquisition.loss += int(self.state.acquisition.file is not None)
             return {}
 
     def drain_pending(self):
@@ -114,7 +221,7 @@ class CortexService:
         if not session.get('id'):
             raise CortexError('Cortex did not create a headset session.')
         with self.state.lock:
-            self.state.headset = {'id': headset['id'], 'status': headset['status']}
+            self.state.headset = {'id': headset['id'], 'status': headset['status'], 'settings': headset.get('settings', {}), 'firmware': headset.get('firmware')}
             self.state.session_id = session['id']
         result = self.request('subscribe', {
             'cortexToken': self.token, 'session': session['id'], 'streams': list(self.settings.streams),
@@ -129,6 +236,7 @@ class CortexService:
     def listen(self):
         next_check = time.monotonic() + 5
         while not self.stop_event.is_set():
+            self.process_requests()
             try:
                 self.state.receive(self.read_message())
             except websocket.WebSocketTimeoutException:
@@ -138,6 +246,14 @@ class CortexService:
                 self.drain_pending()
                 if not any(h.get('id') == self.state.headset['id'] and h.get('status') == 'connected' for h in headsets):
                     raise CortexError('Headset disconnected. Reconnect it in Emotiv Launcher; retrying automatically.')
+                with self.state.lock:
+                    current = next(h for h in headsets if h.get('id') == self.state.headset['id'])
+                    new_settings = current.get('settings', {})
+                    if new_settings.get('eegRate') != self.state.headset.get('settings', {}).get('eegRate'):
+                        self.state.acquisition.configure_filter(None)
+                        self.state.filtered_eeg.clear()
+                        self.state.event('Acquisition rate changed; filter disabled.')
+                    self.state.headset['settings'] = new_settings
                 next_check = time.monotonic() + 5
 
     def close_session(self):
@@ -150,6 +266,10 @@ class CortexService:
             self.ws.close()
         self.ws = None
         self.token = None
+        while not self.requests.empty():
+            _, _, future = self.requests.get_nowait()
+            if not future.done():
+                future.set_exception(CortexError('Cortex disconnected before request execution.'))
         self.pending.clear()
         self.state.set_connection('cortex', 'disconnected', 'Cortex socket closed; waiting for retry.')
         self.state.set_connection('headset', 'unknown', 'Headset connection cannot be verified while Cortex is disconnected.')

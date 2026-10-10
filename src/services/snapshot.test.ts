@@ -33,7 +33,27 @@ describe('rolling EEG history', () => {
     expect(appendHistory([sample(1)], [sample(20)])).toEqual([sample(20)]);
   });
   it('caps memory even if samples arrive unusually quickly', () => {
-    const result = appendHistory([], Array.from({ length: 5000 }, (_, i) => sample(i / 1000)));
+    const result = appendHistory([], Array.from({ length: MAX_SAMPLES + 1000 }, (_, i) => sample(i / 10000)));
     expect(result).toHaveLength(MAX_SAMPLES);
+  });
+});
+
+describe('incremental participant transport', () => {
+  it('keeps the same history object for empty unchanged batches', () => {
+    const history = [sample(1)];
+    expect(appendHistory(history, [])).toBe(history);
+  });
+  it('accepts empty incremental batches with sequence metadata', () => {
+    const result = parseSnapshot(JSON.stringify({...snapshot, eeg: [], epoch: 2, sequence: 10, feed_dropped: 3, metric_history: []}));
+    expect(result.eeg).toEqual([]);
+    expect(result.feed_dropped).toBe(3);
+  });
+  it('rejects corrupted derived scores and history', () => {
+    expect(() => parseSnapshot(JSON.stringify({...snapshot, participant: {phase:'review', message:'test', valid_samples:10,
+      estimate:{state:'Relaxed', scores:{Relaxed:'wrong'}, contributions:{}}}}))).toThrow();
+    expect(() => parseSnapshot(JSON.stringify({...snapshot, metric_history:[{time:1, values:{rel:[]}}]}))).toThrow();
+  });
+  it('respects a selected larger bounded history window', () => {
+    expect(appendHistory([sample(1)], [sample(20)], 30)).toHaveLength(2);
   });
 });

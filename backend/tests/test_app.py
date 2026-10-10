@@ -39,3 +39,37 @@ class LocalTransportTests(unittest.TestCase):
         with patch('backend.app.temi.url', ''):
             self.assertEqual(self.client.post('/api/temi/stop').status_code, 503)
         self.assertEqual(self.client.post('/api/temi/speak', json={'text': ''}).status_code, 422)
+
+    def test_participant_routes_gate_data_and_preserve_cortex_session(self):
+        state.session_id = 'existing-cortex'
+        with patch('backend.app.cortex.submit') as submit:
+            self.assertEqual(self.client.post('/api/session', json={'action':'start'}).status_code, 200)
+            self.assertEqual(self.client.post('/api/session', json={'action':'assess'}).status_code, 409)
+            self.assertEqual(self.client.post('/api/session', json={'action':'baseline'}).status_code, 200)
+            self.assertEqual(state.participant.phase, 'baseline')
+            self.assertEqual(self.client.post('/api/session', json={'action':'confirm'}).status_code, 409)
+            self.assertEqual(self.client.post('/api/session', json={'action':'end'}).status_code, 200)
+            submit.assert_not_called()
+        self.assertEqual(state.session_id, 'existing-cortex')
+        state.event('Real route test activity')
+        self.assertEqual(self.client.post('/api/events/clear').status_code, 200)
+        self.assertEqual(list(state.events), [])
+
+    def test_recording_consent_replay_blocks_robot_and_profiles(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory() as temp, patch('backend.acquisition.ROOT', Path(temp)):
+            self.client.post('/api/session', json={'action':'start'})
+            self.assertEqual(self.client.post('/api/recording', json={'action':'start'}).status_code, 409)
+            self.assertEqual(self.client.post('/api/recording', json={'action':'start', 'consent':True}).status_code, 200)
+            name = state.acquisition.path
+            self.client.post('/api/recording', json={'action':'stop'})
+            self.client.post('/api/session', json={'action':'end'})
+            self.assertEqual(self.client.post('/api/recording', json={'action':'replay','file':name}).status_code, 200)
+            with patch('backend.app.temi.send') as send, patch('backend.app.cortex.submit') as submit:
+                self.assertEqual(self.client.post('/api/temi/speak', json={'text':'Test'}).status_code, 503)
+                self.assertEqual(self.client.post('/api/profile', json={'operation':'load','profile':'Test'}).status_code, 409)
+                send.assert_not_called()
+                submit.assert_not_called()
+            self.assertEqual(self.client.post('/api/recording', json={'action':'exit_replay'}).status_code, 200)
+            self.assertFalse(state.acquisition.snapshot()['replay'])

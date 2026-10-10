@@ -1,0 +1,6 @@
+import type { Snapshot } from '../../types/dashboard';
+const positions: [string, number, number][] = [['AF3',90,65],['AF4',190,65],['F7',45,100],['F8',235,100],['F3',95,110],['F4',185,110],['FC5',65,150],['FC6',215,150],['T7',35,190],['T8',245,190],['P7',60,240],['P8',220,240],['O1',105,280],['O2',175,280]];
+export function Electrodes({snapshot}: {snapshot: Snapshot | null}) {
+  const [dev,eq] = [snapshot?.latest.dev?.values, snapshot?.latest.eq?.values];
+  return <figure className="electrodes"><svg viewBox="0 0 280 330" role="img" aria-label="EPOC X fourteen electrode locations, front at top"><ellipse cx="140" cy="175" rx="108" ry="130" fill="none" stroke="currentColor"/><path d="M125 45 L140 25 L155 45" fill="none" stroke="currentColor"/><text x="140" y="17" textAnchor="middle">Front</text>{positions.map(([name,x,y]) => <g key={name}><circle cx={x} cy={y} r="17" fill="#20232d" stroke="#929dff"/><text x={x} y={y+4} textAnchor="middle">{name}</text></g>)}</svg><figcaption>14 EPOC X electrodes · schematic locations</figcaption><table><thead><tr><th>Channel</th><th>Contact (dev)</th><th>EEG (eq)</th></tr></thead><tbody>{positions.map(([name]) => <tr key={name}><th>{name}</th><td>{dev?.[name] ?? 'Unavailable'}</td><td>{eq?.[name] ?? 'Unavailable'}</td></tr>)}</tbody></table></figure>;
+}

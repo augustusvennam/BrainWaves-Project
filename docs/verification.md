@@ -1,33 +1,31 @@
-# Refactor verification
+# Verification and hardware acceptance
 
-Verification performed October 3, 2026 using Python 3.14.4, Node 25.9.0, and headless Chrome on macOS.
+Local verification on October 10, 2026, on macOS with Node 25.9.0 and Python 3.14.4. No headset, Cortex credentials/license, Temi robot, Android SDK or Gradle was available for hardware/Android acceptance.
 
 ## Automated checks
 
-- TypeScript type checking and production Vite build passed.
-- ESLint and Ruff passed.
-- Six frontend tests passed: payload validation, invalid data rejection, overlapping-batch deduplication, rolling-window expiry, and bounded memory.
-- Twenty-one backend tests passed: raw EEG/metadata separation, nested contact quality, inactive/null metrics, malformed values, timestamps, Cortex-provided band labels, session filtering/reset, bounded state, RPC ID matching, interleaved notifications, handshake, basic/activated session licensing, retry, shutdown session closure, missing credentials, HTTP endpoints, WebSocket delivery/reconnect, origin rejection, and optional robot error handling.
-- Dependency audit reported no frontend dependency vulnerabilities after updating Vitest to 4.1.11.
-- Repository scans found no runtime mock generators, removed mock endpoints, or deployment-provider dependencies/configuration. Test fixtures deliberately use controlled samples.
-- `git diff --check` passed.
+Before changes: 7 Vitest tests and 25 unittest tests passed; TypeScript, ESLint/Ruff and production build passed. The repository uses unittest, not pytest.
 
-## Local startup and browser checks
+After changes: 11 frontend tests and 42 backend tests passed, including optional SciPy filtering. TypeScript, ESLint/Ruff, production Vite build, dependency consistency (`pip check`) and `git diff --check` passed. Tests cover schema parsing, inactive/null values, sample sequence cursors, slow consumers, duplicate/out-of-order timestamps, recording before browser eviction, raw markers/loss estimates, malformed replay, replay isolation/EOF, reconnect/reset, baseline/assessment sample coverage, persistence, stale-review masking, invalid transitions, profile ownership, queue ownership/epoch cancellation, neutral-action acceptance, and command acknowledgements/completion/timeouts. Controlled fixtures exist only in tests.
 
-`npm run dev` started Vite on localhost:3000 and Uvicorn on 127.0.0.1:8000 from the new environment. In Chrome, the frontend connected through the actual backend WebSocket, fetched `/api/health` successfully using browser CORS, and showed the genuine waiting-for-credentials state with empty charts.
+`constraints.txt` pins the verified runtime/dev transitive versions; `requirements-filter.txt` pins SciPy/NumPy. GitHub Actions is configured for Python 3.11/3.14 and Node 24. That hosted workflow has not been run or published in this session. The local environment is Python 3.14; other OS/Python installations remain CI/setup acceptance checks.
 
-A temporary browser test intercepted only its own WebSocket and supplied clearly identified test fixtures. It verified waveform pixels were rendered, single/all-channel selection, performance metric and band bars, malformed snapshot handling and recovery, clearing traces/metrics when sessions reset, browser transport reconnect, and a 390-pixel mobile viewport without horizontal overflow. No uncaught browser errors occurred. The fixture/tool was installed outside the repository and is not an application dependency.
+## Browser verification
 
-## Hardware boundary
+`npm run dev` starts both local services. Headless Chrome checked the actual backend connection, unavailable/empty hardware states, real start/baseline/end routes and sample gating without hardware. Browser-only intercepted protocol fixtures checked review/confirmation transitions, waveforms, pause/resume, windows/common scaling/all channels, timestamped trends, invalid snapshot recovery, socket disconnect/reconnect, history resets and Replay command isolation. Desktop 1440×1000 and phone 390×844 had no horizontal overflow or uncaught page errors. These fixtures do not demonstrate physical acquisition, training or robot completion.
 
-No physical headset or Temi robot was used. Controlled fixtures verify protocol interpretation and UI behavior, not actual sensor acquisition, license entitlement, signal quality, mental-command training reliability, motion, or physical stopping.
+Repeat with services running: install Python Playwright in a development environment, install its Chrome-compatible browser, then `python scripts/browser_check.py`. The script uses the installed Google Chrome channel and writes ignored screenshots under `artifacts/`. It starts no hardware mock service. Screenshot content labelled Controlled browser test fixture is test-only. The design detector reported only the pre-existing status accent border, retained to preserve the user's requested visual style.
 
-The default configuration starts without hardware and contains blank Emotiv credentials. To finish hardware acceptance, configure real credentials and permissions, receive actual `dev`/`eq` and desired licensed streams, confirm amplitudes/channel labels and sample freshness, and test headset power-off/reconnect. Verify optional Temi speech/stop against the installed bridge independently before designing movement integration.
+## Hardware acceptance procedure (not performed)
 
-## Remaining development scope
+1. Record operating system, Cortex/Launcher, headset firmware, account/license, and Android/Temi Launcher/SDK versions. Configure real credentials locally and approve access. Keep credentials out of browser variables.
+2. Prepare and fit EPOC X under vendor instructions. Verify 14 channel labels, contact/EEG quality, active metrics, raw amplitude units and the actual reported `settings.eegRate`. Confirm denied streams are clearly unavailable, not replaced.
+3. Complete a real baseline and assessment at the actual met rate. Interrupt quality/freshness and confirm no time-only success; compare raw timestamps against another trusted acquisition display. End/reset and verify the Cortex session ID stays unchanged and no authorization/debit/createSession occurs on participant reset.
+4. Load an EPOC-compatible writable owned profile, train neutral then one action, exercise accept/reject/cancel, save and reload. Try another app's profile and verify this app refuses to alter it. Verify `sys` event timing on the real Cortex version.
+5. Power off/reconnect the headset; ensure participant cancellation, fresh empty histories and new baseline. Explicit active Cortex reconnects can consume quota; verify account behavior before using activation in repeated demos.
+6. With consent, record a sustained real session without browser clients; compare counts/timestamps/markers against acquisition metadata, deliberately delay a browser consumer, inspect summary loss and quality flags, and verify raw data survives browser eviction. Test storage-full/size-limit behavior. Replay the actual file, including EOF, and verify no robot/profile actions occur.
+7. Compare causal filtered and raw views using acquisition rate metadata. Check rate-change/discontinuity resets and frequency-dependent delay; document artifacts and limitations. No filter accuracy or emotion accuracy is claimed.
+8. Build/install `android-bridge` with the documented toolchain. On the real robot verify readiness, authentication, exact command IDs, speech/TTS completion, display expression, duplicate-ID idempotency, stop/cancel, timeout and network loss. Verify physical stopping using vendor procedures, independently of the HTTP/SDK acknowledgement.
+9. Follow [voluntary participant self-report evaluation](estimated-state.md) before reporting any estimated-state performance. Record abstentions, excluded intervals and all measured results.
 
-- Hardware validation with the intended headset, account, license, and Temi firmware.
-- Training/profile controls if the project needs to manage participants inside this UI.
-- A real Android bridge and robot-side watchdog/completion contract before movement automation.
-- Artifact rejection or additional derived frequency analysis only if explicitly needed and validated against real samples.
-- Lossless recording/consent workflow if recording is added; current visualization is bounded and non-recording.
+There is no autonomous navigation, dancing, EEG-triggered motion, validated emotion recognition, or verified emergency-stop system. Lab Streaming Layer remains an optional future architecture extension.

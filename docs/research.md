@@ -40,6 +40,6 @@ Stream availability and rates depend on model, settings, and license. Raw EEG re
 
 ## Boundaries
 
-Physical headset pairing and electrode preparation are handled using Emotiv software/instructions. Participant mental-command training is handled in EmotivBCI. The backend discovers an already-connected device; it does not pair hardware or choose/load a training profile.
+Physical headset pairing and electrode preparation are handled using Emotiv software/instructions. Participant mental-command training is available through the operator controls or EmotivBCI. The backend discovers an already-connected device; it does not pair hardware. Explicit profile controls use the single socket-owner request queue.
 
 Every sample must match the active session, contain a finite timestamp, and match its schema. EEG samples with invalid amplitudes are rejected. Performance metrics with inactive or invalid values become unavailable. Short-lived sample history is for visualization, not clinical interpretation or lossless recording.

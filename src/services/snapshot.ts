@@ -40,15 +40,42 @@ export function parseSnapshot(raw: string): Snapshot {
   for (const event of value.events) {
     if (!object(event) || !number(event.time) || typeof event.message !== 'string') throw new Error('Malformed event.');
   }
+  for (const name of ['epoch', 'sequence', 'feed_dropped']) {
+    if (value[name] !== undefined && !number(value[name])) throw new Error('Malformed sequence metadata.');
+  }
+  for (const name of ['metric_history', 'filtered_eeg']) {
+    const batch = value[name];
+    if (batch !== undefined && (!Array.isArray(batch) || batch.length > 2048 || batch.some(s =>
+      !object(s) || !number(s.time) || !object(s.values) || !Object.values(s.values).every(v => v === null || number(v))))) throw new Error('Malformed incremental history.');
+  }
+  if (value.participant !== undefined) {
+    const participant = value.participant;
+    if (!object(participant) || typeof participant.phase !== 'string' || typeof participant.message !== 'string' ||
+        !number(participant.valid_samples) || !object(participant.estimate) || typeof participant.estimate.state !== 'string' ||
+        !object(participant.estimate.scores) || !Object.values(participant.estimate.scores).every(number) ||
+        !object(participant.estimate.contributions) || !Object.values(participant.estimate.contributions).every(number)) throw new Error('Malformed participant state.');
+  }
+  if (value.profiles !== undefined && (!object(value.profiles) || !Array.isArray(value.profiles.items) ||
+      !object(value.profiles.current) || typeof value.profiles.training !== 'string')) throw new Error('Malformed profile state.');
+  if (value.recording !== undefined) {
+    const recording = value.recording;
+    if (!object(recording) || typeof recording.active !== 'boolean' || typeof recording.replay !== 'boolean' ||
+      !number(recording.loss) || !object(recording.filter) || typeof recording.filter.enabled !== 'boolean' ||
+      typeof recording.filter.settings !== 'string') throw new Error('Malformed recording state.');
+  }
+  if (value.commands !== undefined && (!Array.isArray(value.commands) || value.commands.length > 40 ||
+    value.commands.some(c => !object(c) || typeof c.id !== 'string' || typeof c.action !== 'string' ||
+      !['accepted', 'completed', 'failed', 'cancelled', 'timed_out'].includes(String(c.status)) || !number(c.time)))) throw new Error('Malformed command history.');
   return value as unknown as Snapshot;
 }
 
 export const HISTORY_SECONDS = 10;
-export const MAX_SAMPLES = 4096;
-export function appendHistory(history: EegSample[], incoming: EegSample[]): EegSample[] {
+export const MAX_SAMPLES = 16384;
+export function appendHistory(history: EegSample[], incoming: EegSample[], seconds = HISTORY_SECONDS): EegSample[] {
   const lastTime = history.at(-1)?.time ?? -Infinity;
   const fresh = incoming.filter(sample => sample.time > lastTime);
+  if (!fresh.length) return history;
   const combined = [...history, ...fresh];
   const newest = combined.at(-1)?.time;
-  return newest === undefined ? [] : combined.filter(sample => sample.time >= newest - HISTORY_SECONDS).slice(-MAX_SAMPLES);
+  return newest === undefined ? [] : combined.filter(sample => sample.time >= newest - seconds).slice(-MAX_SAMPLES);
 }

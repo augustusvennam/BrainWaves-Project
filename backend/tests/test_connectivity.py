@@ -43,12 +43,18 @@ class ConnectivityTests(unittest.TestCase):
         with patch('backend.services.temi.requests.get', side_effect=requests.ConnectionError):
             self.assertEqual(TemiBridge('http://robot/api', '').check_connection()[0], 'unavailable')
 
-    def test_commands_use_main_controller_without_mock_mode(self):
-        bridge = TemiBridge('http://robot/api', 'test-token')
-        self.assertFalse(bridge.controller.mock)
-        with patch('backend.legacy.temi_controller.requests.post', return_value=Mock(status_code=200)) as post:
-            self.assertTrue(bridge.send('speak', {'text': 'Hello'})['accepted'])
-            post.assert_called_once_with('http://robot/api/speak', json={'text': 'Hello'}, headers={'Authorization': 'Bearer test-token'}, timeout=3)
-        with patch('backend.legacy.temi_controller.requests.post', return_value=Mock(status_code=503)):
+    def test_v1_commands_exact_body_and_acknowledgement(self):
+        bridge = TemiBridge('http://robot/api', 'test-token', DashboardState())
+        def reply(url, **kwargs):
+            return Mock(json=Mock(return_value={'id': kwargs['json']['id'], 'status': 'accepted'}))
+        with patch('backend.services.temi.requests.post', side_effect=reply) as post:
+            response = bridge.send('speak', {'text': 'Hello'})
+            self.assertTrue(response['accepted'])
+            post.assert_called_once_with('http://robot/api/commands',
+                json={'id': response['id'], 'action': 'speak', 'payload': {'text': 'Hello'}},
+                headers={'Authorization': 'Bearer test-token'}, timeout=3)
+            self.assertEqual(bridge.state.commands[-1]['status'], 'accepted')
+        with patch('backend.services.temi.requests.post', return_value=Mock(json=Mock(return_value={'status': 'completed'}))):
             with self.assertRaises(requests.RequestException):
                 bridge.send('stop')
+        self.assertEqual(bridge.state.commands[-1]['status'], 'failed')
