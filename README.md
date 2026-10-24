@@ -3,8 +3,9 @@
 Local EPOC X demonstration: EMOTIV Cortex → one Python backend → React dashboard,
 with optional estimated-state speech through the Temi Wizard-of-Oz Android app.
 
-This build uses **Basic BCI streams** (`met`, `pow`, `dev`, `eq`). It does not need
-raw EEG access, `emotiv-rs`, mental-command training, a database, or cloud hosting.
+This build uses **Basic BCI streams** (`met`, `pow`, `dev`, `eq`, and `com` for
+mental commands). It does not need raw EEG access, `emotiv-rs`, a database, or cloud
+hosting. Mental-command training is done in EMOTIV BCI, not in this code.
 
 ## Requirements
 
@@ -57,7 +58,7 @@ Use Python 3.11+; edit `.env` as above. On macOS substitute `.venv/bin/python` f
 .\.venv\Scripts\python.exe -m scripts.test_cortex --seconds 45
 ```
 
-The test requires actual decoded packets from **all four streams**. It prints
+The test requires actual decoded packets from **all five subscribed streams**. It prints
 column metadata and packet counts, without credentials. A connection or a successful
 subscription alone does not constitute a pass. This smoke test does not validate mood accuracy.
 
@@ -81,7 +82,16 @@ Use module commands (`python -m ...`), not `python src/file.py`.
 
 The dashboard remains accessible while Cortex is unavailable and reports its actual
 status. The backend retries after disconnection. Backend connectivity, headset data,
-and usable EEG quality are shown separately.
+usable EEG quality, battery, and Temi status are shown in one system-status card.
+
+## Mental command dashboard
+
+The top panel shows the trained **Push / Pull / Neutral** mental commands from the
+`com` stream (8 Hz). The active command lights up with its power level; the other two
+stay idle. Commands are trained in EMOTIV BCI — this code only displays them.
+
+The estimated-state heuristic below the command panel is unchanged: it is a
+demonstration mood estimate from performance metrics, not a validated emotion.
 
 ## Optional Temi speech
 
@@ -115,11 +125,14 @@ verification. `requirements-lock.txt` records the Python versions exercised by t
 ## Code map
 
 - `src/cortex_api_client.py`: trusted TLS, JSON-RPC, approval, discovery, session,
-  subscription metadata, and a single socket reader.
+  subscription metadata, and a single socket reader. Decodes all streams including
+  `com` mental commands.
 - `src/websocket_server.py`: acquisition lifecycle, normalized browser events,
-  fresh-data checks, reconnection, and optional Temi speech.
+  fresh-data checks, reconnection, optional Temi speech, and mental-command state.
 - `src/mood_determiner.py`: quality checks, valid-sample window, state stability.
 - `src/temi_controller.py`: matching command IDs and actual speech completion.
+- `src/components/ui/EEGDashboard.tsx`: live mental-command panel (Push/Pull/Neutral),
+  system-status card, metric graphs, and band-power chart.
 - `src/services/websocket.ts`: browser transport and reconnect cleanup.
 - `tests/test_integration.py`: protocol, estimation, and real local WebSocket tests.
 
