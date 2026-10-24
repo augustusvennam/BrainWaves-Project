@@ -1,0 +1,4 @@
+websocket-client>=1.8,<2
+websockets>=14,<16
+PyYAML>=6,<7
+python-dotenv>=1,<2

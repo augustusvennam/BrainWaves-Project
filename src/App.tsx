@@ -1,0 +1,162 @@
+/**
+ * BrainWaves Project — BrainBot Dashboard
+ * Real-time EEG monitoring UI with Linear design system.
+ *
+ * Architecture: EPOC X → Cortex API → Python brainbot_main.py → Temi Robot
+ *
+ * Data streams from Cortex:
+ *   - `met`, `pow`, `dev`, `eq` (Basic BCI streams)
+ *
+ * The dashboard connects to a local Python WebSocket server for live data.
+ * Run `python -m src.websocket_server` to start the backend.
+ */
+
+import { useState } from 'react';
+import {
+  Badge,
+  LogEntry,
+  MilestoneCard,
+  SectionTitle,
+  SectionSubtitle,
+  ArchitectureDiagram,
+  EEGDashboard,
+} from './components/ui';
+
+// Type definitions
+type MilestoneStatus = 'complete' | 'in-progress' | 'pending';
+
+// Default milestone data
+const defaultMilestones: Record<string, MilestoneStatus> = {
+  structure: 'complete',
+  'cortex-research': 'complete',
+  'temi-research': 'complete',
+  framework: 'in-progress',
+  'cortex-creds': 'pending',
+  hardware: 'pending',
+};
+
+// Default activity log entries
+const defaultLogs: { id: number; time: string; level: 'info' | 'warn' | 'error'; message: string }[] = [
+  { id: 1, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'BrainWaves Project dashboard initialized' },
+  { id: 2, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'Configure credentials in the local .env file' },
+  { id: 3, time: new Date().toISOString().replace('T', ' ').slice(0, 19), level: 'info', message: 'Start python -m src.websocket_server' },
+];
+
+/**
+ * App — Main dashboard composition
+ *
+ * Sections (mobile-first, breakpoints 640/768/1024/1280):
+ *  1. Header — project name + live connection status badges
+ *  2. Real-Time EEG Dashboard — live metric graphs + system monitors
+ *  3. Project Progress — 6 milestone cards with status transitions
+ *  4. Activity Log — timestamped, color-coded entries (info/warn/error)
+ *  5. Architecture Diagram — horizontal flow: EPOC X → Cortex → Python → Temi
+ */
+
+function App() {
+  const [milestones] = useState<Record<string, MilestoneStatus>>(() => ({ ...defaultMilestones }));
+  const [logs, setLogs] = useState<{ id: number; time: string; level: 'info' | 'warn' | 'error'; message: string }[]>(() => [...defaultLogs]);
+
+  return (
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', fontFamily: 'var(--font-text)' }}>
+      <div className="container">
+
+        {/* ===== HEADER ===== */}
+        <header className="card-elevated mb-6 border-b border-[var(--border-default)] pb-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-2">
+              <Badge label="brain" variant="info" dot={false} />
+              <h1 className="text-xl font-medium text-[var(--text-ink)] tracking-tighter">
+                BrainWaves Project
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge label="Localhost" variant="info" dot={false} />
+            </div>
+          </div>
+        </header>
+
+        {/* ===== REAL-TIME EEG DASHBOARD ===== */}
+        <section className="mb-8">
+          <EEGDashboard />
+        </section>
+
+        {/* ===== PROJECT PROGRESS ===== */}
+        <section className="mb-6">
+          <SectionTitle>Implementation milestones</SectionTitle>
+          <SectionSubtitle>
+            6 milestones — {Object.values(milestones).filter(s => s === 'complete').length} complete,{' '}
+            {Object.values(milestones).filter(s => s === 'in-progress').length} in progress,{' '}
+            {Object.values(milestones).filter(s => s === 'pending').length} pending
+          </SectionSubtitle>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {Object.entries(milestones).map(([id, status]) => {
+              const fallbackMap: Record<string, { title: string; desc: string }> = {
+                structure: { title: 'Project structure created', desc: 'Repository layout, Vite config, component scaffolding' },
+                'cortex-research': { title: 'Cortex API research', desc: 'EMOTIV Cortex WebSocket API (wss://localhost:6868)' },
+                'temi-research': { title: 'Temi integration research', desc: 'Temi speech protocol and completion IDs' },
+                framework: { title: 'Base framework ready', desc: 'React + Vite dashboard shell' },
+                'cortex-creds': { title: 'Cortex API credentials', desc: 'Register at emotiv.com/my-account → Cortex Apps' },
+                hardware: { title: 'Hardware testing', desc: 'Physical headset checks pending on your computer' },
+              };
+              const fb = fallbackMap[id] || { title: id, desc: '' };
+              return (
+                <MilestoneCard
+                  key={id}
+                  id={id}
+                  title={fb.title}
+                  description={fb.desc}
+                  status={status}
+                  onClick={() => {}}
+                />
+              );
+            })}
+          </div>
+        </section>
+
+        {/* ===== ACTIVITY LOG ===== */}
+        <section className="mb-6">
+          <SectionTitle>Setup notes</SectionTitle>
+          <SectionSubtitle>Startup guidance; these entries are not live device events</SectionSubtitle>
+
+          <div className="rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--border-default)] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--border-hairline)]">
+              <span className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider">Log entries</span>
+            </div>
+            <div className="px-4 py-2">
+              <button onClick={() => setLogs([])} className="text-xs text-[var(--accent)] hover:underline">Clear</button>
+            </div>
+          </div>
+
+          <div className="mt-3 rounded-[var(--radius-lg)] bg-[var(--surface-1)] border border-[var(--border-default)]">
+            <div className="px-4 py-2" style={{ maxHeight: '320px', overflowY: 'auto' }}>
+              {logs.map((entry) => (
+                <LogEntry
+                  key={entry.id}
+                  id={entry.id}
+                  time={entry.time}
+                  level={entry.level}
+                  message={entry.message}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ===== ARCHITECTURE DIAGRAM ===== */}
+        <section className="pt-4">
+          <SectionTitle>Architecture</SectionTitle>
+          <SectionSubtitle>Data flow: EEG capture → real-time streaming → brainwave processing → robot control</SectionSubtitle>
+          <ArchitectureDiagram />
+          <div className="mt-4 pt-4 border-t border-[var(--border-hairline)] text-xs text-[var(--text-tertiary)]">
+            <strong>Note:</strong> This diagram shows the intended integration. Current connection status appears in the dashboard above.
+          </div>
+        </section>
+
+      </div>
+    </div>
+  );
+}
+
+export default App;
