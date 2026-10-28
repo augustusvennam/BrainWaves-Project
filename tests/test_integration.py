@@ -7,14 +7,16 @@ import time
 import unittest
 from unittest.mock import patch
 
+from websockets import Request, Response, Headers
 from websockets.asyncio.client import connect
 from websockets.asyncio.server import serve
+from websockets.utils import accept_key
 
 from src.config import load_config
 from src.cortex_api_client import CortexClient, CortexError
 from src.mood_determiner import MoodDeterminer
 from src.temi_controller import TemiController
-from src.websocket_server import EEGWebSocketServer
+from src.websocket_server import EEGWebSocketServer, _accept_any_connection
 
 
 class Socket:
@@ -202,6 +204,62 @@ class BackendTests(unittest.IsolatedAsyncioTestCase):
         finally:
             worker.cancel()
             await asyncio.gather(worker, return_exceptions=True)
+
+    def test_connection_header_without_upgrade_token_is_accepted(self):
+        """Some stacks send 'Connection: keep-alive' on the upgrade request.
+        The handshake must still succeed (101) rather than reject with 426."""
+        import base64
+        import os
+
+        key = base64.b64encode(os.urandom(16)).decode()
+        request = Request('/', Headers({
+            'Upgrade': 'websocket',
+            'Connection': 'keep-alive',
+            'Sec-WebSocket-Key': key,
+        }))
+        response = _accept_any_connection(None, request)
+        self.assertIsInstance(response, Response)
+        self.assertEqual(response.status_code, 101)
+        self.assertEqual(response.headers['Connection'], 'Upgrade')
+        self.assertEqual(response.headers['Upgrade'], 'websocket')
+        self.assertEqual(response.headers['Sec-WebSocket-Accept'], accept_key(key))
+
+    def test_standard_connection_header_is_accepted(self):
+        """A compliant 'Connection: Upgrade' request still works."""
+        import base64
+        import os
+
+        key = base64.b64encode(os.urandom(16)).decode()
+        request = Request('/', Headers({
+            'Upgrade': 'websocket',
+            'Connection': 'Upgrade',
+            'Sec-WebSocket-Key': key,
+        }))
+        response = _accept_any_connection(None, request)
+        self.assertIsInstance(response, Response)
+        self.assertEqual(response.status_code, 101)
+
+    def test_non_websocket_upgrade_is_rejected(self):
+        """A request without Upgrade: websocket must fall back to the default
+        handshake, which rejects it (no 101 response)."""
+        import base64
+        import os
+
+        key = base64.b64encode(os.urandom(16)).decode()
+        request = Request('/', Headers({
+            'Upgrade': 'not-websocket',
+            'Connection': 'Upgrade',
+            'Sec-WebSocket-Key': key,
+        }))
+        self.assertIsNone(_accept_any_connection(None, request))
+
+    def test_missing_websocket_key_is_rejected(self):
+        """A request without Sec-WebSocket-Key must not be accepted."""
+        request = Request('/', Headers({
+            'Upgrade': 'websocket',
+            'Connection': 'keep-alive',
+        }))
+        self.assertIsNone(_accept_any_connection(None, request))
 
 
 if __name__ == '__main__':

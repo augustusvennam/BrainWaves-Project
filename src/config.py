@@ -20,6 +20,7 @@ def load_config(config_path=None):
         'headset_id': os.getenv('CORTEX_HEADSET_ID') or None,
     })
     config['temi']['robot_ip'] = os.getenv('TEMI_IP', config['temi']['robot_ip'])
+    config['server']['host'] = os.getenv('SERVER_HOST', config['server']['host'])
     config['temi']['enabled'] = os.getenv('TEMI_ENABLED', '0') == '1'
     config['temi']['auto_speak'] = os.getenv('TEMI_AUTO_SPEAK', '0') == '1'
     return config

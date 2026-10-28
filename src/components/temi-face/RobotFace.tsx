@@ -38,7 +38,12 @@ export function RobotFace() {
         }
       }
     });
-    websocketService.connect('ws://127.0.0.1:8080');
+    // Connect back to the host that served this page, so the Temi reaches the
+    // laptop's backend instead of its own loopback address.
+    const backendHost = typeof window !== 'undefined' && window.location.hostname
+      ? window.location.hostname
+      : '127.0.0.1';
+    websocketService.connect(`ws://${backendHost}:8080`);
     return () => {
       offConnect();
       offDisconnect();

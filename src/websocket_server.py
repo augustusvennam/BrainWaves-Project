@@ -8,12 +8,40 @@ from collections import deque
 
 from websockets.asyncio.server import serve
 from websockets.exceptions import ConnectionClosed
+from websockets import Headers, Request, Response
+from websockets.utils import accept_key
 
 from src.config import load_config, cortex_from_config
 from src.mood_determiner import MoodDeterminer, valid_metrics, number
 from src.temi_controller import TemiController
 
 log = logging.getLogger(__name__)
+
+
+def _accept_any_connection(connection, request):
+    """Accept a WebSocket upgrade even if the Connection header lacks the
+    'upgrade' token.
+
+    Some browser/network stacks send 'Connection: keep-alive' on the upgrade
+    request instead of 'Connection: Upgrade'. The Upgrade header, the
+    Sec-WebSocket-Key, and the Sec-WebSocket-Accept handshake still fully
+    authenticate the connection — only the overly-strict Connection token
+    check is relaxed.
+
+    Returns None to fall back to the library's default handshake, which
+    enforces the RFC 6455 Connection header rules.
+    """
+    upgrade = request.headers.get('Upgrade', '')
+    if upgrade.lower() != 'websocket':
+        return None
+    if 'Sec-WebSocket-Key' not in request.headers:
+        return None
+    key = request.headers['Sec-WebSocket-Key']
+    return Response(101, 'Switching Protocols', Headers({
+        'Connection': 'Upgrade',
+        'Upgrade': 'websocket',
+        'Sec-WebSocket-Accept': accept_key(key),
+    }))
 
 
 class EEGWebSocketServer:
@@ -104,7 +132,7 @@ class EEGWebSocketServer:
             elif stream == 'pow':
                 self.state['bands'] = payload
             elif stream == 'com':
-                # Mental command: {act: 'push'|'pull'|'neutral', pow: 0..1}
+                # Mental command: {act: 'push'|'pull'|'lift'|'drop'|'neutral', pow: 0..1}
                 self.state['command'] = payload
                 self.state['command_history'].append((packet.get('time'), payload))
                 if len(self.state['command_history']) > 200:
@@ -201,8 +229,10 @@ class EEGWebSocketServer:
     async def run(self):
         cfg = self.config['server']
         async with serve(self.handler, cfg['host'], cfg['port'],
+                         process_request=_accept_any_connection,
                          origins=['http://localhost:3000', 'http://127.0.0.1:3000',
-                                  'http://localhost:4173', 'http://127.0.0.1:4173'], max_size=16384):
+                                  'http://localhost:4173', 'http://127.0.0.1:4173',
+                                  'http://192.168.241.138:3000'], max_size=16384):
             log.info('Dashboard backend: ws://%s:%s', cfg['host'], cfg['port'])
             tasks = [asyncio.create_task(fn()) for fn in
                      (self.acquisition, self.process, self.heartbeat, self.temi_health)]

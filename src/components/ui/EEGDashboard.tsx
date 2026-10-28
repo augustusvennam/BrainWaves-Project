@@ -12,6 +12,8 @@ const COLORS = ['#a78bfa', '#34d399', '#60a5fa', '#fb923c', '#f472b6'];
 const COMMAND_STATES = [
   { id: 'push', label: 'Push', color: '#ec4899' },
   { id: 'pull', label: 'Pull', color: '#60a5fa' },
+  { id: 'lift', label: 'Lift', color: '#a78bfa' },
+  { id: 'drop', label: 'Drop', color: '#fb923c' },
   { id: 'neutral', label: 'Neutral', color: '#94a3b8' },
 ] as const;
 function object(value: unknown): Values {
@@ -70,7 +72,7 @@ export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string
     </div>
     <Card><CardHeader><SectionTitle>Mental command</SectionTitle></CardHeader>
       <CardBody>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           {COMMAND_STATES.map((state_item) => {
             const isActive = activeCommand === state_item.id;
             return (
