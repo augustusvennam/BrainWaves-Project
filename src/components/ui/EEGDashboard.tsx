@@ -10,12 +10,13 @@ type Values = Record<string, unknown>;
 const BANDS = ['theta', 'alpha', 'betaL', 'betaH', 'gamma'] as const;
 const COLORS = ['#a78bfa', '#34d399', '#60a5fa', '#fb923c', '#f472b6'];
 const COMMAND_STATES = [
-  { id: 'push', label: 'Push', color: '#ec4899' },
-  { id: 'pull', label: 'Pull', color: '#60a5fa' },
-  { id: 'lift', label: 'Lift', color: '#a78bfa' },
-  { id: 'drop', label: 'Drop', color: '#fb923c' },
-  { id: 'neutral', label: 'Neutral', color: '#94a3b8' },
+  { id: 'neutral', label: 'Calm (Neutral)', color: '#94a3b8' },
+  { id: 'push', label: 'Happy (Push)', color: '#97ec48' },
+  { id: 'pull', label: 'Sad (Pull)', color: '#60a5fa' },
+  { id: 'lift', label: 'Angry (Lift)', color: '#ff3333' },
+  { id: 'drop', label: 'Anxious (Drop)', color: '#e040d3' },
 ] as const;
+
 function object(value: unknown): Values {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Values : {};
 }
@@ -26,35 +27,45 @@ export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string
   const [bands, setBands] = useState<Values[]>([]);
   const [lastBackend, setLastBackend] = useState(0);
   const [now, setNow] = useState(Date.now());
+
   useEffect(() => {
     const offConnect = websocketService.onConnect(() => setConnected(true));
     const offDisconnect = websocketService.onDisconnect(() => {
       setConnected(false); setState({}); setBands([]);
     });
+
     const offMessage = websocketService.onMessage(message => {
       setLastBackend(Date.now());
+
       if (message.type === 'state') {
         setState(message.data);
         if (!message.data.cortex_connected) setBands([]);
       }
+
       if (message.type === 'pow') {
         const row: Values = { time: new Date(Number(message.data.sample_time) * 1000).toLocaleTimeString() };
+
         for (const band of BANDS) {
           const values = Object.entries(message.data)
             .filter(([key, value]) => key.endsWith(`/${band}`) && typeof value === 'number' && Number.isFinite(value))
             .map(([, value]) => value as number);
           row[band] = values.length ? values.reduce((a, b) => a + b, 0) / values.length : null;
         }
+
         setBands(previous => [...previous.slice(-239), row]);
       }
     });
+
     const timer = setInterval(() => setNow(Date.now()), 1000);
     websocketService.connect(wsUrl);
+
     return () => {
       offConnect(); offDisconnect(); offMessage(); clearInterval(timer);
       websocketService.disconnect();
     };
+
   }, [wsUrl]);
+
   const backendFresh = connected && now - lastBackend < 5000;
   const times = object(state.last_sample_time);
   const quality = object(state.quality);
@@ -70,7 +81,7 @@ export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string
       <Badge label={backendFresh && state.cortex_connected ? 'Cortex streaming' : 'Cortex unavailable'} variant={backendFresh && state.cortex_connected ? 'online' : 'warning'} dot />
       <span className="text-sm text-[var(--text-subtle)]">{backendFresh ? String(state.status || 'Waiting') : 'Waiting for backend heartbeat'}</span>
     </div>
-    <Card><CardHeader><SectionTitle>Mental command</SectionTitle></CardHeader>
+    <Card><CardHeader><SectionTitle>Current Mood</SectionTitle></CardHeader>
       <CardBody>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
           {COMMAND_STATES.map((state_item) => {
