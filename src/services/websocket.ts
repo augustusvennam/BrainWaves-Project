@@ -5,6 +5,12 @@ export interface CortexMessage {
   data: Record<string, unknown>;
 }
 type Callback<T> = (value: T) => void;
+
+// Hotspot connections drop. Track status so the UI can show a live
+// "connected / reconnecting" indicator instead of silently going blank.
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+type StatusCallback = (status: ConnectionStatus) => void;
+
 class WebSocketService {
   private ws: WebSocket | null = null;
   private url: string | null = null;
@@ -14,11 +20,13 @@ class WebSocketService {
   private connects = new Set<() => void>();
   private disconnects = new Set<() => void>();
   private errors = new Set<Callback<Event>>();
+  private statuses = new Set<StatusCallback>();
   private add<T>(set: Set<T>, callback: T) { set.add(callback); return () => { set.delete(callback); }; }
   onMessage(cb: Callback<CortexMessage>) { return this.add(this.messages, cb); }
   onConnect(cb: () => void) { return this.add(this.connects, cb); }
   onDisconnect(cb: () => void) { return this.add(this.disconnects, cb); }
   onError(cb: Callback<Event>) { return this.add(this.errors, cb); }
+  onStatus(cb: StatusCallback) { return this.add(this.statuses, cb); }
   isConnected() { return this.ws?.readyState === WebSocket.OPEN; }
   connect(url: string) {
     this.disconnect();
@@ -28,11 +36,13 @@ class WebSocketService {
   }
   private open() {
     if (!this.url) return;
+    this.statuses.forEach(cb => cb('connecting'));
     const ws = new WebSocket(this.url);
     this.ws = ws;
     ws.onopen = () => {
       if (this.ws !== ws) return;
       this.attempts = 0;
+      this.statuses.forEach(cb => cb('connected'));
       this.connects.forEach(cb => cb());
     };
     ws.onmessage = event => {
@@ -47,6 +57,7 @@ class WebSocketService {
       if (this.ws !== ws) return;
       this.ws = null;
       this.disconnects.forEach(cb => cb());
+      this.statuses.forEach(cb => cb('disconnected'));
       if (this.url) this.timer = setTimeout(() => this.open(), Math.min(1000 * 2 ** this.attempts++, 10000));
     };
   }
@@ -61,3 +72,13 @@ class WebSocketService {
   send(message: unknown) { if (this.isConnected()) this.ws?.send(JSON.stringify(message)); }
 }
 export const websocketService = new WebSocketService();
+
+/** Backend URL for the host that served this page.
+ *  On the Temi, window.location.hostname is the laptop's LAN IP, so the robot
+ *  reaches the laptop's backend instead of its own loopback (which is the robot). */
+export function backendUrl(port = 8080): string {
+  const host = typeof window !== 'undefined' && window.location.hostname
+    ? window.location.hostname
+    : '127.0.0.1';
+  return `ws://${host}:${port}`;
+}

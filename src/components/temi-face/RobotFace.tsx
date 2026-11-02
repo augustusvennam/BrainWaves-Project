@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { websocketService, type CortexMessage } from '../../services/websocket';
+import { websocketService, backendUrl, type CortexMessage, type ConnectionStatus } from '../../services/websocket';
 
 type Emotion = 'Happy' | 'Sad' | 'Neutral';
 
@@ -7,6 +7,8 @@ const EMOTIONS: Record<string, { emotion: Emotion; bg: string; face: string }> =
   push:   { emotion: 'Happy',   bg: '#fef3c7', face: '/faces/happy.png' },
   pull:   { emotion: 'Sad',     bg: '#dbeafe', face: '/faces/sad.png' },
   neutral:{ emotion: 'Neutral', bg: '#f3f4f6', face: '/faces/neutral.png' },
+  lift:   { emotion: 'Angry',   bg: '#ff3e3e', face: '/faces/angry.png' },
+  drop:   { emotion: 'Anxious', bg: '#f0abfc', face: '/faces/anxious.png' },
 };
 
 const DEFAULT: { emotion: Emotion; bg: string; face: string } = {
@@ -16,23 +18,18 @@ const DEFAULT: { emotion: Emotion; bg: string; face: string } = {
 export function RobotFace() {
   const [command, setCommand] = useState<string>('');
   const [power, setPower] = useState<number | null>(null);
-  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
   useEffect(() => {
-    const offConnect = websocketService.onConnect(() => setConnected(true));
-    const offDisconnect = websocketService.onDisconnect(() => {
-      setConnected(false);
-      setCommand('');
-      setPower(null);
-    });
+    const offStatus = websocketService.onStatus(setStatus);
     const offMessage = websocketService.onMessage((message: CortexMessage) => {
       if (message.type === 'state') {
         const cmd = message.data.command as { act?: string; pow?: number } | undefined;
         if (cmd && cmd.act) {
           setCommand(cmd.act);
           setPower(typeof cmd.pow === 'number' ? cmd.pow : null);
-        } else if (connected) {
-          // Source went stale — show idle.
+        } else {
+          // The backend clears stale commands itself; show idle.
           setCommand('');
           setPower(null);
         }
@@ -40,17 +37,15 @@ export function RobotFace() {
     });
     // Connect back to the host that served this page, so the Temi reaches the
     // laptop's backend instead of its own loopback address.
-    const backendHost = typeof window !== 'undefined' && window.location.hostname
-      ? window.location.hostname
-      : '127.0.0.1';
-    websocketService.connect(`ws://${backendHost}:8080`);
+    websocketService.connect(backendUrl());
     return () => {
-      offConnect();
-      offDisconnect();
+      offStatus();
       offMessage();
       websocketService.disconnect();
     };
-  }, [connected]);
+    // Empty deps on purpose: the service reconnects internally. Re-running this
+    // effect on every status change would tear down and re-open the socket.
+  }, []);
 
   const spec = EMOTIONS[command] ?? DEFAULT;
 
@@ -59,9 +54,9 @@ export function RobotFace() {
       className="flex min-h-screen w-full flex-col items-center justify-center gap-6 px-6 transition-colors duration-500"
       style={{ background: spec.bg }}
     >
-      {!connected && (
+      {status !== 'connected' && (
         <div className="absolute top-4 text-sm text-[var(--text-tertiary)]">
-          Connecting to backend…
+          {status === 'connecting' ? 'Connecting to backend…' : 'Disconnected from backend'}
         </div>
       )}
       <img

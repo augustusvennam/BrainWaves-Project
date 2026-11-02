@@ -4,7 +4,7 @@ import Card, { CardBody, CardHeader } from './Card';
 import Badge from './Badge';
 import { SectionTitle } from './SectionTitle';
 import { EEGGraph, EEG_METRICS } from './EEGGraph';
-import { websocketService } from '../../services/websocket';
+import { websocketService, backendUrl, type ConnectionStatus } from '../../services/websocket';
 
 type Values = Record<string, unknown>;
 const BANDS = ['theta', 'alpha', 'betaL', 'betaH', 'gamma'] as const;
@@ -21,18 +21,20 @@ function object(value: unknown): Values {
   return value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Values : {};
 }
 
-export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string }) {
+export function EEGDashboard({ wsUrl = backendUrl() }: { wsUrl?: string }) {
   const [connected, setConnected] = useState(false);
   const [state, setState] = useState<Values>({});
   const [bands, setBands] = useState<Values[]>([]);
   const [lastBackend, setLastBackend] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
   useEffect(() => {
     const offConnect = websocketService.onConnect(() => setConnected(true));
     const offDisconnect = websocketService.onDisconnect(() => {
       setConnected(false); setState({}); setBands([]);
     });
+    const offStatus = websocketService.onStatus(setStatus);
 
     const offMessage = websocketService.onMessage(message => {
       setLastBackend(Date.now());
@@ -60,7 +62,7 @@ export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string
     websocketService.connect(wsUrl);
 
     return () => {
-      offConnect(); offDisconnect(); offMessage(); clearInterval(timer);
+      offConnect(); offDisconnect(); offMessage(); offStatus(); clearInterval(timer);
       websocketService.disconnect();
     };
 
@@ -79,6 +81,11 @@ export function EEGDashboard({ wsUrl = 'ws://127.0.0.1:8080' }: { wsUrl?: string
     <div className="flex flex-wrap gap-3 items-center">
       <Badge label={backendFresh ? 'Backend connected' : 'Backend unavailable'} variant={backendFresh ? 'online' : 'warning'} dot />
       <Badge label={backendFresh && state.cortex_connected ? 'Cortex streaming' : 'Cortex unavailable'} variant={backendFresh && state.cortex_connected ? 'online' : 'warning'} dot />
+      <Badge
+        label={status === 'connected' ? 'Connected' : status === 'connecting' ? 'Reconnecting…' : 'Disconnected'}
+        variant={status === 'connected' ? 'online' : status === 'connecting' ? 'warning' : 'error'}
+        dot
+      />
       <span className="text-sm text-[var(--text-subtle)]">{backendFresh ? String(state.status || 'Waiting') : 'Waiting for backend heartbeat'}</span>
     </div>
     <Card><CardHeader><SectionTitle>Current Mood</SectionTitle></CardHeader>

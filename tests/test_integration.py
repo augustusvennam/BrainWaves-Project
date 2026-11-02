@@ -109,6 +109,7 @@ class ProtocolTests(unittest.TestCase):
                 self.count = 0
             def __enter__(self): return self
             def __exit__(self, *args): pass
+            def close(self): pass  # simulate a context manager, not used by new code
             def settimeout(self, value): pass
             def send(self, message): self.command = json.loads(message)
             def recv(self):

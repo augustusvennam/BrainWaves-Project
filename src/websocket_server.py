@@ -3,6 +3,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import socket
 import time
 from collections import deque
 
@@ -42,6 +43,49 @@ def _accept_any_connection(connection, request):
         'Upgrade': 'websocket',
         'Sec-WebSocket-Accept': accept_key(key),
     }))
+
+
+def lan_addresses():
+    """Every IPv4 this machine listens on, so a phone-hotspot IP change does not
+    silently break the Temi origin check. Deduplicated, loopback excluded."""
+    addresses = set()
+    try:
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        probe.connect(('8.8.8.8', 80))  # no traffic sent; just picks the default route
+        addresses.add(probe.getsockname()[0])
+        probe.close()
+    except OSError:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if not ip.startswith('127.'):
+                addresses.add(ip)
+    except OSError:
+        pass
+    return sorted(addresses)
+
+
+def dashboard_origins(ports=(3000, 4173)):
+    """Allowed Origin header values for the dashboard and robot-face pages.
+
+    The Temi loads the page from the laptop's LAN IP, so that origin has to be
+    accepted. Built at startup from the interfaces actually present.
+    """
+    origins = ['http://localhost:3000', 'http://127.0.0.1:3000',
+               'http://localhost:4173', 'http://127.0.0.1:4173']
+    for ip in lan_addresses():
+        for port in ports:
+            origins.append(f'http://{ip}:{port}')
+    return origins
+
+
+def lan_display_ip(config_host):
+    """The IP to print for the Temi, or None when bound to loopback only."""
+    if config_host not in ('0.0.0.0', '::'):
+        return config_host if config_host != '127.0.0.1' else None
+    addresses = lan_addresses()
+    return addresses[0] if addresses else None
 
 
 class EEGWebSocketServer:
@@ -228,12 +272,18 @@ class EEGWebSocketServer:
 
     async def run(self):
         cfg = self.config['server']
+        origins = dashboard_origins()
         async with serve(self.handler, cfg['host'], cfg['port'],
                          process_request=_accept_any_connection,
-                         origins=['http://localhost:3000', 'http://127.0.0.1:3000',
-                                  'http://localhost:4173', 'http://127.0.0.1:4173',
-                                  'http://192.168.241.138:3000'], max_size=16384):
+                         origins=origins, max_size=16384):
             log.info('Dashboard backend: ws://%s:%s', cfg['host'], cfg['port'])
+            lan_ip = lan_display_ip(cfg['host'])
+            if lan_ip:
+                log.info('Open on Temi: http://%s:3000', lan_ip)
+                log.info('Robot face:    http://%s:3000/face', lan_ip)
+            else:
+                log.info('Bound to loopback only; a Temi on the LAN cannot connect. '
+                         'Set SERVER_HOST=0.0.0.0 in .env for the demo.')
             tasks = [asyncio.create_task(fn()) for fn in
                      (self.acquisition, self.process, self.heartbeat, self.temi_health)]
             try:
