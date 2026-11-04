@@ -55,7 +55,7 @@ export function RobotFace() {
       style={{ background: spec.bg }}
     >
       {status !== 'connected' && (
-        <div className="absolute top-4 text-sm text-[var(--text-tertiary)]">
+        <div className="absolute top-4 text-sm text-(--text-tertiary)">
           {status === 'connecting' ? 'Connecting to backend…' : 'Disconnected from backend'}
         </div>
       )}
@@ -73,11 +73,11 @@ export function RobotFace() {
           target.parentElement?.insertBefore(next, target);
         }}
       />
-      <h1 className="text-5xl font-semibold tracking-tight text-[var(--text-ink)]">
+      <h1 className="text-5xl font-semibold tracking-tight text-(--text-ink)">
         {spec.emotion}
       </h1>
       {power !== null && (
-        <p className="text-lg text-[var(--text-subtle)]">
+        <p className="text-lg text-(--text-subtle)">
           Intensity {power.toFixed(2)}
         </p>
       )}

@@ -24,9 +24,9 @@ export default function Badge({
   return (
     <span
       className={[
-        'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)]',
+        'inline-flex items-center gap-1.5 rounded-(--radius-pill)',
         'px-2 py-0.5 text-[11px] font-medium',
-        'transition-colors duration-[var(--duration-fast)]',
+        'transition-colors duration-(--duration-fast)',
         variantStyles[variant],
         className,
       ].join(' ')}

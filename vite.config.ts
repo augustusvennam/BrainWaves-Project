@@ -1,19 +1,23 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import tailwindcss from '@tailwindcss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
     sourcemap: true,
     chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          // Split vendor bundles for better caching
-          vendor: ['react', 'react-dom'],
-          ui: ['lucide-react'],
+        manualChunks(id) {
+          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) {
+            return 'vendor'
+          }
+          if (id.includes('node_modules/lucide-react/')) {
+            return 'ui'
+          }
         },
       },
     },
