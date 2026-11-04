@@ -98,36 +98,39 @@ export function RobotFace() {
           </div>
         )}
       </div>
-      <div className="absolute top-0 left-[20%] text-sm text-(--text-tertiary) text-center">
-        <img
-          src={spec.face}
-          alt={spec.emotion}
-          className="h-300 w-300 object-contain drop-shadow-lg"
-          onError={(e) => {
-            // Fall back to an emoji if the face file isn't present yet.
-            const target = e.currentTarget;
-            target.style.display = "none";
-            const next = document.createElement("div");
-            next.className = "text-9xl";
-            next.textContent =
-              spec.emotion === "Happy"
-                ? "🙂"
-                : spec.emotion === "Sad"
-                  ? "🙁"
-                  : "😐";
-            target.parentElement?.insertBefore(next, target);
-          }}
-        />
-        {/*
-        <h1 className="text-5xl font-semibold tracking-tight text-(--text-ink) mt-3">
-          {spec.emotion}
-        </h1>
-        {power !== null && (
-          <p className="text-lg text-(--text-subtle)">
-            Intensity {power.toFixed(2)}
-          </p>
-        )}
-        */}
+     <div>
+        <div className="absolute top-[-30%] left-[0%] text-sm text-(--text-tertiary) text-center">
+          <img
+            src={spec.face}
+            alt={spec.emotion}
+            className="h-500 w-500 object-contain drop-shadow-lg"
+            onError={(e) => {
+              // Fall back to an emoji if the face file isn't present yet.
+              const target = e.currentTarget;
+              target.style.display = "none";
+              const next = document.createElement("div");
+              next.className = "text-9xl";
+              next.textContent =
+                spec.emotion === "Happy"
+                  ? "🙂"
+                  : spec.emotion === "Sad"
+                    ? "🙁"
+                    : "😐";
+              target.parentElement?.insertBefore(next, target);
+            }}
+          />
+        </div>
+          
+        <div className="absolute top-[10%] right-[46%] flex flex-col gap-7">
+          <h1 className="text-5xl font-semibold tracking-tight text-(--text-ink) mt-3">
+            {spec.emotion}
+          </h1>
+          {power !== null && (
+            <p className="text-lg text-(--text-subtle) text-center">
+              Intensity {power.toFixed(2)}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
