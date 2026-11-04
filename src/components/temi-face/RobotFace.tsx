@@ -6,22 +6,27 @@ import {
   type ConnectionStatus,
 } from "../../services/websocket";
 import ShapeGrid from "../ShapeGrid";
+import happyFace from "./faces/happy.png";
+import sadFace from "./faces/sad.png";
+import neutralFace from "./faces/neutral.png";
+import angryFace from "./faces/angry.png";
+import anxiousFace from "./faces/anxious.png";
 
 type Emotion = "Happy" | "Sad" | "Neutral" | "Angry" | "Anxious";
 
 const EMOTIONS: Record<string, { emotion: Emotion; bg: string; face: string }> =
   {
-    push: { emotion: "Happy", bg: "#fef3c7", face: "/faces/happy.png" },
-    pull: { emotion: "Sad", bg: "#dbeafe", face: "/faces/sad.png" },
-    neutral: { emotion: "Neutral", bg: "#f3f4f6", face: "/faces/neutral.png" },
-    lift: { emotion: "Angry", bg: "#ff3e3e", face: "/faces/angry.png" },
-    drop: { emotion: "Anxious", bg: "#f0abfc", face: "/faces/anxious.png" },
+    push: { emotion: "Happy", bg: "#fef3c7", face: happyFace },
+    pull: { emotion: "Sad", bg: "#dbeafe", face: sadFace },
+    neutral: { emotion: "Neutral", bg: "#f3f4f6", face: neutralFace },
+    lift: { emotion: "Angry", bg: "#ff3e3e", face: angryFace },
+    drop: { emotion: "Anxious", bg: "#f0abfc", face: anxiousFace },
   };
 
 const DEFAULT: { emotion: Emotion; bg: string; face: string } = {
   emotion: "Neutral",
   bg: "#f3f4f6",
-  face: "/faces/neutral.png",
+  face: neutralFace,
 };
 
 export function RobotFace() {
