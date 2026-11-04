@@ -98,11 +98,11 @@ export function RobotFace() {
           </div>
         )}
       </div>
-      <div className="absolute top-[40%] left-[45%] text-sm text-(--text-tertiary) text-center">
+      <div className="absolute top-0 left-[20%] text-sm text-(--text-tertiary) text-center">
         <img
           src={spec.face}
           alt={spec.emotion}
-          className="h-64 w-64 object-contain drop-shadow-lg"
+          className="h-300 w-300 object-contain drop-shadow-lg"
           onError={(e) => {
             // Fall back to an emoji if the face file isn't present yet.
             const target = e.currentTarget;
@@ -118,6 +118,7 @@ export function RobotFace() {
             target.parentElement?.insertBefore(next, target);
           }}
         />
+        {/*
         <h1 className="text-5xl font-semibold tracking-tight text-(--text-ink) mt-3">
           {spec.emotion}
         </h1>
@@ -126,6 +127,7 @@ export function RobotFace() {
             Intensity {power.toFixed(2)}
           </p>
         )}
+        */}
       </div>
     </div>
   );
