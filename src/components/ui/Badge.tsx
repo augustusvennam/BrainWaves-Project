@@ -25,7 +25,7 @@ export default function Badge({
     <span
       className={[
         'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)]',
-        'px-2 py-0.5 text-[11px] font-medium tracking-wide uppercase',
+        'px-2 py-0.5 text-[11px] font-medium',
         'transition-colors duration-[var(--duration-fast)]',
         variantStyles[variant],
         className,
@@ -33,7 +33,6 @@ export default function Badge({
     >
       {dot && (
         <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-75" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
         </span>
       )}

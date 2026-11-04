@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { websocketService, backendUrl, type CortexMessage, type ConnectionStatus } from '../../services/websocket';
 
-type Emotion = 'Happy' | 'Sad' | 'Neutral';
+type Emotion = 'Happy' | 'Sad' | 'Neutral' | 'Angry' | 'Anxious';
 
 const EMOTIONS: Record<string, { emotion: Emotion; bg: string; face: string }> = {
   push:   { emotion: 'Happy',   bg: '#fef3c7', face: '/faces/happy.png' },

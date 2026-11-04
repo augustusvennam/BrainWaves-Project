@@ -38,7 +38,7 @@ export function ArchitectureDiagram() {
   ];
 
   return (
-    <section className="pb-8">
+    <section className="pb-4">
       <SectionTitle>Architecture</SectionTitle>
       <SectionSubtitle>Data flow: EEG capture → real-time streaming → brainwave processing → robot control</SectionSubtitle>
 
@@ -48,7 +48,7 @@ export function ArchitectureDiagram() {
             <div className="flex flex-col items-center gap-1.5 text-center">
               <div
                 className={[
-                  'relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--surface-2)] text-[var(--accent)]',
+                  'relative flex h-12 w-12 items-center justify-center rounded-[var(--radius-sm)] bg-[var(--surface-2)] text-[var(--text-tertiary)]',
                   'border border-[var(--border-hairline)]',
                 ].join(' ')}
               >
@@ -57,13 +57,13 @@ export function ArchitectureDiagram() {
               <div className="text-xs text-[var(--text-tertiary)] line-clamp-1 max-w-[140px]">
                 {node.label}
               </div>
-              <div className="text-[10px] text-[var(--text-subtle)] line-clamp-1 max-w-[140px]">
+              <div className="text-[9px] text-[var(--text-tertiary)] line-clamp-1 max-w-[140px]">
                 {node.sub}
               </div>
             </div>
             {i < nodes.length - 1 && (
               <ArrowRight
-                className="h-5 w-5 text-[var(--accent)]"
+                className="h-4 w-4 text-[var(--text-tertiary)]"
                 style={{ transform: 'rotate(90deg)' }}
               />
             )}

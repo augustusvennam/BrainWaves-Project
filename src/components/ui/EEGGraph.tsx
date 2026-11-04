@@ -116,14 +116,7 @@ export function EEGGraph({
       <CardHeader>
         <div className="flex items-center justify-between">
           <SectionTitle className="mb-0">{title}</SectionTitle>
-          <span
-            className="text-xs font-mono px-2 py-1 rounded"
-            style={{
-              background: `${color}22`,
-              color: color,
-              border: `1px solid ${color}44`,
-            }}
-          >
+          <span className="text-xs font-mono text-[var(--text-ink)] tabular-nums">
             {currentValue !== null ? currentValue.toFixed(2) : '--'}
           </span>
         </div>
@@ -219,8 +212,8 @@ export const EEG_METRICS = [
     threshold: 0.5,
   },
   {
-    metric: 'lex',
-    title: 'Long-term Excitement',
+    metric: 'attention',
+    title: 'Attention',
     color: '#06b6d4',
     threshold: 0.5,
   },

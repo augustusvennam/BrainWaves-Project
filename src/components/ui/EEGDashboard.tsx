@@ -8,7 +8,7 @@ import { websocketService, backendUrl, type ConnectionStatus } from '../../servi
 
 type Values = Record<string, unknown>;
 const BANDS = ['theta', 'alpha', 'betaL', 'betaH', 'gamma'] as const;
-const COLORS = ['#a78bfa', '#34d399', '#60a5fa', '#fb923c', '#f472b6'];
+const COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#fb923c', '#f472b6'];
 const COMMAND_STATES = [
   { id: 'neutral', label: 'Calm (Neutral)', color: '#94a3b8' },
   { id: 'push', label: 'Happy (Push)', color: '#97ec48' },
@@ -96,34 +96,33 @@ export function EEGDashboard({ wsUrl = backendUrl() }: { wsUrl?: string }) {
             return (
               <div
                 key={state_item.id}
-                className="rounded-[var(--radius-lg)] border p-4 text-center transition-colors duration-200"
+                className="rounded-[var(--radius-lg)] border p-4 text-center"
                 style={{
                   borderColor: isActive ? state_item.color : 'var(--border-default)',
                   background: isActive ? `${state_item.color}15` : 'var(--surface-1)',
                 }}
               >
                 <div
-                  className="text-2xl font-semibold tracking-tight"
-                  style={{ color: isActive ? state_item.color : 'var(--text-tertiary)' }}
+                  className="text-2xl font-medium tracking-tight"
+                  style={{ color: isActive ? state_item.color : 'var(--text-muted)' }}
                 >
                   {state_item.label}
                 </div>
-                <div className="mt-1 text-xs text-[var(--text-subtle)]">
+                <div className="mt-1 text-xs text-[var(--text-tertiary)]">
                   {isActive ? `active · power ${Number(command.pow).toFixed(2)}` : 'idle'}
                 </div>
               </div>
             );
           })}
         </div>
-        <p className="mt-3 text-xs text-[var(--text-subtle)]">
-          Mental commands update at 8 Hz from the trained Push / Pull / Neutral profile in EMOTIV BCI.
-          {commandAge === null ? ' No command received yet.' : ` Last command ${commandAge}s ago.`}
+        <p className="mt-2 text-xs text-[var(--text-tertiary)]">
+          Mental commands sample at 8 Hz from the EMOTIV BCI profile. {commandAge === null ? 'No command received yet.' : `Last command ${commandAge}s ago.`}
         </p>
       </CardBody></Card>
     <Card>
       <CardHeader><SectionTitle>System status</SectionTitle></CardHeader>
       <CardBody>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-3 gap-4 text-sm">
           <div>
             <div className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">EEG quality</div>
             <div className="mt-1 text-lg font-medium">
@@ -153,11 +152,11 @@ export function EEGDashboard({ wsUrl = backendUrl() }: { wsUrl?: string }) {
       <CardBody>
         <p className="text-sm text-[var(--text-subtle)] mb-3">Mean across available channels, µV²/Hz. Cortex band powers update at 8 Hz; this is derived activity, not a raw EEG waveform.</p>
         {backendFresh && bandAge < 5 && bands.length ? <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={bands}><XAxis dataKey="time" minTickGap={60} /><YAxis /><Tooltip />
+          <LineChart data={bands}><XAxis dataKey="time" minTickGap={60} /><YAxis /><Tooltip contentStyle={{ background: '#010102', border: '1px solid var(--border-hairline)', borderRadius: '8px', color: 'var(--text-ink)' }} />
             {BANDS.map((band, i) => <Line key={band} dataKey={band} stroke={COLORS[i]} dot={false} isAnimationActive={false} connectNulls={false} />)}
           </LineChart>
         </ResponsiveContainer> : <p className="py-8 text-center">Waiting for fresh frequency-band samples…</p>}
-        <div className="flex flex-wrap gap-4 text-xs">{BANDS.map((band, i) => <span key={band} style={{color: COLORS[i]}}>{band}</span>)}</div>
+        <div className="flex flex-wrap gap-4 text-xs">{BANDS.map((band, i) => <span key={band} className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: COLORS[i] }} /><span style={{ color: COLORS[i] }}>{band}</span></span>)}</div>
       </CardBody></Card>
   </div>;
 }

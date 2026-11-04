@@ -1,3 +1,6 @@
+import React from 'react';
+import { Info, AlertTriangle, AlertCircle } from 'lucide-react';
+
 type LogEntryLevel = 'info' | 'warn' | 'error';
 
 interface LogEntryProps {
@@ -7,16 +10,10 @@ interface LogEntryProps {
   message: string;
 }
 
-const levelStyles: Record<LogEntryLevel, string> = {
-  info: 'text-[var(--accent)]',
-  warn: 'text-[var(--warning)]',
-  error: 'text-[var(--error)]',
-};
-
-const levelIcon: Record<LogEntryLevel, string> = {
-  info: 'i',
-  warn: '!',
-  error: 'x',
+const levelIcon: Record<LogEntryLevel, React.ElementType> = {
+  info: Info,
+  warn: AlertTriangle,
+  error: AlertCircle,
 };
 
 function formatTime(isoString: string): string {
@@ -28,14 +25,15 @@ function formatTime(isoString: string): string {
   }
   if (isNaN(date.getTime())) return isoString;
   return date.toLocaleTimeString('en-US', {
+    hour12: false,
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false,
   });
 }
 
 export default function LogEntry({ id, time, level, message }: LogEntryProps) {
+  const Icon = levelIcon[level];
   return (
     <div
       key={id}
@@ -47,19 +45,10 @@ export default function LogEntry({ id, time, level, message }: LogEntryProps) {
       >
         {formatTime(time)}
       </time>
-      <span
-        className={[
-          'flex h-5 w-5 items-center justify-center rounded-[var(--radius-xs)]',
-          'text-[10px] font-bold flex-shrink-0 mt-0.5',
-          level === 'info' && 'bg-[var(--accent-soft)] text-[var(--accent)]',
-          level === 'warn' && 'bg-[var(--warning-soft)] text-[var(--warning)]',
-          level === 'error' && 'bg-[var(--error-soft)] text-[var(--error)]',
-        ].join(' ')}
-        aria-label={level}
-      >
-        {levelIcon[level]}
+      <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center text-[var(--text-tertiary)] mt-0.5">
+        <Icon size={14} strokeWidth={1.5} />
       </span>
-      <p className={['text-[13px] leading-6 flex-1 min-w-0', levelStyles[level]].join(' ')}>
+      <p className="text-[13px] leading-6 flex-1 min-w-0 text-[var(--text-muted)]">
         {message}
       </p>
     </div>

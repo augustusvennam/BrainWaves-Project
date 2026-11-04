@@ -62,7 +62,7 @@ export default function MilestoneCard({
       aria-label={`${title}: ${badge}`}
     >
       <span className={`flex-shrink-0 mt-0.5 ${statusConfig[status].iconColor}`}>
-        <Icon size={16} strokeWidth={2} />
+        <Icon size={14} strokeWidth={1.5} />
       </span>
 
       <div className="flex-1 min-w-0">
@@ -73,17 +73,17 @@ export default function MilestoneCard({
           <span
             className={[
               'flex-shrink-0 rounded-[var(--radius-pill)]',
-              'px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+              'px-2 py-0.5 text-[10px] font-medium',
               variant === 'online' && 'bg-[var(--success-soft)] text-[var(--success)]',
               variant === 'warning' && 'bg-[var(--warning-soft)] text-[var(--warning)]',
               variant === 'info' && 'bg-[var(--accent-soft)] text-[var(--accent)]',
-              variant === 'idle' && 'bg-[var(--surface-2)] text-[var(--text-subtle)]',
+              variant === 'idle' && 'bg-[var(--surface-2)] text-[var(--text-muted)]',
             ].join(' ')}
           >
             {badge}
           </span>
         </div>
-        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-subtle)] line-clamp-2">
+        <p className="mt-1.5 text-[12px] leading-relaxed text-[var(--text-muted)] line-clamp-2">
           {description}
         </p>
       </div>
