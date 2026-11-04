@@ -61,7 +61,7 @@ export function RobotFace() {
   const spec = EMOTIONS[command] ?? DEFAULT;
 
   return (
-    <div style={{ width: "100%", height: "700px", position: "relative" }}>
+    <div style={{ width: "100%", height: "1080px", position: "relative" }}>
       <ShapeGrid
         shape="square"
         direction="diagonal"
