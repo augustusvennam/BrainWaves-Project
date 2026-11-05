@@ -99,7 +99,7 @@ export function RobotFace() {
         )}
       </div>
      <div>
-        <div className="absolute top-[-30%] left-[0%] text-sm text-(--text-tertiary) text-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-6 px-6">
           <img
             src={spec.face}
             alt={spec.emotion}
@@ -121,8 +121,8 @@ export function RobotFace() {
           />
         </div>
           
-        <div className="absolute top-[10%] right-[46%] flex flex-col gap-7">
-          <h1 className="text-5xl font-semibold tracking-tight text-(--text-ink) mt-3">
+      <div className="absolute inset-0 flex flex-col items-center justify-top gap-6 px-6">
+          <h1 className="text-5xl font-bold tracking-tight text-(--text-ink) mt-3 text-center">
             {spec.emotion}
           </h1>
           {power !== null && (
