@@ -138,7 +138,7 @@ export function EEGDashboard({ wsUrl = backendUrl() }: { wsUrl?: string }) {
           <div>
             <div className="text-xs uppercase tracking-wide text-[var(--text-tertiary)]">Temi</div>
             <div className="mt-1 text-lg font-medium">
-              {backendFresh && state.temi_connected ? 'Connected' : 'Disabled or unavailable'}
+              N/A
             </div>
           </div>
         </div>

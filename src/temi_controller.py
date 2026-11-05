@@ -2,12 +2,12 @@
 import json
 import time
 import uuid
-
+from .config import temi_ip, temi_port, temi_timeout_s
 import websocket
 
 
 class TemiController:
-    def __init__(self, robot_ip='192.168.1.100', port=8175, timeout_s=30):
+    def __init__(self, robot_ip=temi_ip, port=temi_port, timeout_s=temi_timeout_s):
         self.url = f'ws://{robot_ip}:{port}'
         self.timeout_s = timeout_s
 
